@@ -14,7 +14,7 @@ usuario los **confirma o corrige** antes de que nada se guarde.
 
 ## Estado
 
-En construcción — **Fase 0 (esqueleto)**. Ver [PLAN.md](PLAN.md).
+En construcción — Fase 0 (esqueleto) completada; **Fase 1 (CRUD manual)** en curso. Ver [PLAN.md](PLAN.md).
 
 ## Stack
 
@@ -43,6 +43,10 @@ Requiere [uv](https://docs.astral.sh/uv/) y Python 3.11.
 uv sync
 cp .env.example .env      # y rellena ANTHROPIC_API_KEY
 ```
+
+> El proyecto fija `system-certs = true` en `pyproject.toml` para funcionar tras
+> un proxy TLS corporativo. Si `uv` da un error de certificado igualmente, usa
+> `uv sync --system-certs`.
 
 La clave de API solo hace falta para la lectura por IA. Catalogar, consultar,
 editar, listar y buscar funcionan sin conexión.

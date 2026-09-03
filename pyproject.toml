@@ -1,0 +1,43 @@
+[project]
+name = "antcollect"
+version = "0.1.0"
+description = "Catálogo personal de monedas con lectura por IA de visión; comprueba si una moneda encontrada ya está en la colección."
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "gradio>=4.44",
+    "pillow>=10.4",
+    "python-dotenv>=1.0",
+    "anthropic>=0.40",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.6",
+    "pytest>=8.3",
+]
+
+[tool.uv]
+# El equipo usa un proxy TLS con CA propia; usar el almacén de certificados del
+# sistema en vez del bundle de uv.
+system-certs = true
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/antcollect"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+extend-exclude = ["*.md", "Docs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
