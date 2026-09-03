@@ -1,0 +1,40 @@
+# --- Secretos y datos del usuario (NUNCA a git) ---
+.env
+.env.*
+!.env.example
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+antcollect.db
+/imagenes/
+/data/
+/backups/
+antcollect.log
+*.log
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.uv/
+.python-version
+
+# --- Tests / herramientas ---
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# --- Editores / OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
