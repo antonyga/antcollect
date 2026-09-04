@@ -6,6 +6,7 @@ valores se leen del entorno; nada se hardcodea (RNF-5).
 
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 
@@ -43,3 +44,19 @@ def hay_ia() -> bool:
 def asegurar_directorios() -> None:
     """Crea la carpeta de imágenes si no existe."""
     IMAGENES_DIR.mkdir(parents=True, exist_ok=True)
+
+
+_logging_configurado = False
+
+
+def configurar_logging() -> None:
+    """Registra coste/errores de la app en ``antcollect.log`` (RNF-4). Idempotente."""
+    global _logging_configurado
+    if _logging_configurado:
+        return
+    logging.basicConfig(
+        filename=str(LOG_PATH),
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+    _logging_configurado = True

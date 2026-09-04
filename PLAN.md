@@ -9,7 +9,7 @@
 
 ---
 
-## Fase actual: **2 — Lectura por IA (`CoinReader`)**
+## Fase actual: **3 — Comprobar "¿La tengo?"**
 
 ---
 
@@ -55,25 +55,30 @@ foto, año en blanco, aviso de duplicado, edición y borrado con confirmación.
 
 ---
 
-## Fase 2 — Lectura por IA (`CoinReader`)  ·  rama `feat/fase-2-coinreader`
+## Fase 2 — Lectura por IA (`CoinReader`)  ·  rama `feat/fase-2-coinreader`  ·  ✅ completada
 
 Cubre: RF-1, RF-3, RF-7 (lectura con 2 fotos), RNF-4, RNF-6.
 **Antes de codificar: confirmar id de modelo y API de visión/tool use en https://docs.claude.com.**
+Confirmado: `claude-sonnet-5` es el id vigente (1M contexto, tool use estándar); se mantiene como modelo por defecto.
 
-- [ ] `ai/base.py`: `CoinReader` (ABC) + `LecturaMoneda` (dataclass con `campos_dudosos`)
-- [ ] `ai/claude.py`: `ClaudeCoinReader`
-  - [ ] redimensionar con Pillow antes de enviar (lado largo ~1568 px)
-  - [ ] imágenes base64 antes del texto en el mensaje
-  - [ ] `tool use` con esquema = 5 campos + `campos_dudosos`
-  - [ ] prompt de sistema: no inventar, `null` + `campos_dudosos` si ilegible, año 4 cifras o `null`, usar anverso+reverso
-  - [ ] manejo de errores → lectura fallida, sin excepción al usuario, log en `antcollect.log`
-- [ ] Registro discreto de coste/errores por llamada
-- [ ] Pipeline compartido **capturar → leer → confirmar**
-- [ ] Flujo "Enseñar moneda nueva" (RF-1): sube foto(s) → `CoinReader.leer()` → formulario **prerrellenado** con `campos_dudosos` resaltados → usuario confirma/corrige → aviso de duplicado (RF-14) → guardar
-- [ ] Degradación: sin red / error → UI informa y ofrece modo manual (RF-6)
-- [ ] Tests: parseo de respuesta IA, mapeo a `LecturaMoneda`, camino de error
+- [x] `ai/base.py`: `CoinReader` (ABC) + `LecturaMoneda` (dataclass con `campos_dudosos`)
+- [x] `ai/claude.py`: `ClaudeCoinReader`
+  - [x] redimensionar con Pillow antes de enviar (lado largo ~1568 px)
+  - [x] imágenes base64 antes del texto en el mensaje
+  - [x] `tool use` con esquema = 5 campos + `campos_dudosos`
+  - [x] prompt de sistema: no inventar, `null` + `campos_dudosos` si ilegible, año 4 cifras o `null`, usar anverso+reverso
+  - [x] manejo de errores → lectura fallida, sin excepción al usuario, log en `antcollect.log`
+- [x] Registro discreto de coste/errores por llamada
+- [x] Pipeline compartido **capturar → leer → confirmar** (formulario de la Fase 1 reutilizado tal cual)
+- [x] Flujo "Enseñar moneda nueva" (RF-1): sube foto(s) → `CoinReader.leer()` → formulario **prerrellenado** con `campos_dudosos` resaltados → usuario confirma/corrige → aviso de duplicado (RF-14, ya cubierto por `coleccion.crear`) → guardar
+- [x] Degradación: sin red / error → UI informa y ofrece modo manual (RF-6)
+- [x] Tests: parseo de respuesta IA, mapeo a `LecturaMoneda`, camino de error
 
 **Sale usable:** enseñar monedas con foto + lectura asistida y confirmación humana.
+Probado en navegador con Playwright contra el servidor real: sin foto (aviso),
+con clave de API inválida (degrada a manual con todos los campos resaltados),
+"prefiero rellenarlo a mano", cancelar captura, y sin `ANTHROPIC_API_KEY`
+configurada (va directo al formulario en blanco).
 
 ---
 
@@ -140,3 +145,4 @@ Cubre: RF-13, §10, retoques de RF-12 y textos.
 | 2026-09-04 | Orden de fases: IA adelantada a Fase 2 | este archivo |
 | 2026-09-04 | Git: rama por fase + PR, Conventional Commits en español | CLAUDE.md §8 |
 | 2026-09-04 | Repo: github.com/antonyga/antcollect, público | CLAUDE.md §8 |
+| 2026-09-04 | Modelo IA confirmado: `claude-sonnet-5` sigue vigente | CLAUDE.md §4, PLAN.md Fase 2 |
