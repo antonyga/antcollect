@@ -23,7 +23,6 @@ dist/
 .venv/
 venv/
 .uv/
-.python-version
 
 # --- Tests / herramientas ---
 .pytest_cache/

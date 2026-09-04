@@ -9,25 +9,26 @@
 
 ---
 
-## Fase actual: **0 — Esqueleto**
+## Fase actual: **1 — Núcleo de datos + CRUD manual**
 
 ---
 
-## Fase 0 — Esqueleto  ·  rama `feat/fase-0-esqueleto`
+## Fase 0 — Esqueleto  ·  rama `feat/fase-0-esqueleto`  ·  ✅ completada
 
 Objetivo: el proyecto arranca y sirve una página vacía. Infra y control de versiones listos.
 
-- [ ] `git init`, `.gitignore`, primer commit
-- [ ] `gh auth login` (usuario) → crear repo `antonyga/antcollect` público → push de `main`
-- [ ] Proteger `main` en GitHub (no push directo)
-- [ ] `pyproject.toml` con uv, Python 3.11, deps base (gradio, pillow, python-dotenv, anthropic) + dev (ruff, pytest)
-- [ ] `.env.example` con `ANTHROPIC_API_KEY` y `ANTCOLLECT_MODELO`
-- [ ] `src/antcollect/config.py`: carga `.env`, rutas de BD e imágenes, modelo, tamaño de resize
-- [ ] `src/antcollect/db.py`: conexión SQLite + creación del esquema (tabla `monedas` + `idx_tipo`)
-- [ ] Carpeta `imagenes/` creada en runtime si no existe
-- [ ] `src/antcollect/ui/app.py`: Gradio arranca, pantalla de inicio con los 2 botones grandes ("Enseñar moneda nueva" / "¿La tengo?"), aún sin lógica
-- [ ] `README.md` inicial: instalar, configurar clave, arrancar en escritorio, abrir desde móvil (IP local), hacer backup
-- [ ] `ruff` y `pytest` configurados; `uv run pytest` pasa (aunque sea 0 tests)
+- [x] `git init`, `.gitignore` / `.gitattributes`, primer commit
+- [x] `gh auth login` → repo `antonyga/antcollect` público → push de `main`
+- [x] `main` protegida (PR obligatorio, historial lineal, sin force-push)
+- [x] `pyproject.toml` con uv, Python 3.11, deps base (gradio, pillow, python-dotenv, anthropic) + dev (ruff, pytest)
+- [x] `.env.example` con `ANTHROPIC_API_KEY` y `ANTCOLLECT_MODELO`
+- [x] `src/antcollect/config.py`: carga `.env`, rutas de BD e imágenes, modelo, tamaño de resize
+- [x] `src/antcollect/db.py`: conexión SQLite + esquema (tabla `monedas` + `idx_tipo`) + `transaccion()`
+- [x] Carpeta `imagenes/` creada en runtime si no existe
+- [x] `src/antcollect/ui/app.py`: Gradio arranca, pantalla de inicio con los 2 botones grandes
+- [x] `README.md` inicial: instalar, configurar clave, arrancar en escritorio, abrir desde móvil, backup
+- [x] `ruff` y `pytest` configurados; `uv run pytest` pasa (2 tests)
+- [x] `[tool.uv] system-certs = true` (el entorno usa un proxy TLS con CA propia)
 
 **Sale usable:** la app abre en el navegador y muestra la pantalla de inicio.
 
