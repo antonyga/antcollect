@@ -9,7 +9,7 @@
 
 ---
 
-## Fase actual: **3 — Comprobar "¿La tengo?"**
+## Fase actual: **4 — Captura y modos**
 
 ---
 
@@ -82,18 +82,24 @@ configurada (va directo al formulario en blanco).
 
 ---
 
-## Fase 3 — Comprobar "¿La tengo?"  ·  rama `feat/fase-3-comprobar`
+## Fase 3 — Comprobar "¿La tengo?"  ·  rama `feat/fase-3-comprobar`  ·  ✅ completada
 
 Cubre: RF-2, RF-4, RF-5. Reutiliza el pipeline de la Fase 2.
 
-- [ ] Flujo "¿La tengo?": captura/sube foto(s) → `CoinReader.leer()` → campos propuestos, dudosos resaltados → usuario ajusta
-- [ ] Consulta por campos normalizados en `coleccion.py`:
-  - [ ] Coincidencia exacta (5 campos) → "✅ Ya la tienes" + ficha guardada con foto al lado de la recién capturada (RF-4)
-  - [ ] Sin coincidencia → "🆕 No la tienes" + botón "Guardar esta" que reutiliza los campos leídos (RF-5)
-  - [ ] Coincidencia parcial (mismo país+valor+año, distinta ceca/variante) o `anio` NULL o campo dudoso → "posible coincidencia", decide el humano
-- [ ] Tests de la lógica de coincidencia: exacta / parcial / sin coincidencia / `anio` NULL no da falso positivo
+- [x] Flujo "¿La tengo?": captura/sube foto(s) → `CoinReader.leer()` → campos propuestos, dudosos resaltados → usuario ajusta
+- [x] Consulta por campos normalizados en `coleccion.py` (`comprobar_tipo`):
+  - [x] Coincidencia exacta (5 campos) → "✅ Ya la tienes" + ficha guardada con foto al lado de la recién capturada (RF-4)
+  - [x] Sin coincidencia → "🆕 No la tienes" + botón "Guardar esta" que reutiliza los campos leídos (RF-5)
+  - [x] Coincidencia parcial (mismo país+valor+año, distinta ceca/variante) o `anio` NULL o campo dudoso → "posible coincidencia", decide el humano
+- [x] Tests de la lógica de coincidencia: exacta / parcial / sin coincidencia / `anio` NULL no da falso positivo
 
 **Sale usable:** el objetivo central de la app funciona de principio a fin.
+Probado en navegador con Playwright contra el servidor real (sin
+`ANTHROPIC_API_KEY`, modo manual directo al formulario "¿La tengo?"): ya la
+tienes (con comparación de fotos y "ver ficha completa"), posible coincidencia
+(distinta ceca, con selector para ver el candidato), sin coincidencia seguido
+de "guardar esta como nueva", y que "Editar" desde una ficha resetea el modo
+del formulario a "Guardar" (no se queda en "Buscar").
 
 ---
 

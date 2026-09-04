@@ -2,8 +2,9 @@
 
 Fase 1: catálogo manual completo (RF-6, RF-9, RF-10, RF-11, RF-12).
 Fase 2: flujo "Enseñar moneda nueva" (RF-1) con lectura por IA (`CoinReader`)
-seguida de confirmación humana (RF-3). El flujo "¿La tengo?" (RF-2) llegará en
-la Fase 3 reutilizando el mismo formulario y la misma llamada a `leer()`.
+seguida de confirmación humana (RF-3).
+Fase 3: flujo "¿La tengo?" (RF-2, RF-4, RF-5), reutilizando el mismo pipeline
+captura → leer → confirmar; solo cambia el paso final (guardar vs. consultar).
 """
 
 from __future__ import annotations
@@ -134,6 +135,90 @@ def _texto_duplicado(existente: Moneda) -> str:
     )
 
 
+def _parsear_campos_formulario(
+    pais: str,
+    valor_texto: str,
+    anio: str,
+    ceca: str,
+    variante: str,
+    notas: str | None = None,
+) -> tuple[dict[str, object] | None, str | None]:
+    """Valida y normaliza los campos del formulario compartido (RF-1/RF-2/RF-6).
+
+    Usado tanto para guardar como para comprobar "¿la tengo?": ambos flujos
+    parten del mismo formulario confirmado por el humano (§1 CLAUDE.md).
+    """
+    pais = (pais or "").strip()
+    valor_texto = (valor_texto or "").strip()
+    anio_texto = (anio or "").strip()
+    if not pais or not valor_texto:
+        return None, "⚠️ País y valor son obligatorios."
+    if anio_texto and not anio_texto.isdigit():
+        return None, "⚠️ El año debe ser un número (déjalo vacío si es ilegible)."
+    return {
+        "pais": pais,
+        "valor_texto": valor_texto,
+        "anio": int(anio_texto) if anio_texto else None,
+        "ceca": (ceca or "").strip() or None,
+        "variante": (variante or "").strip() or None,
+        "notas": (notas or "").strip() or None,
+    }, None
+
+
+def _titulo_captura_para_modo(modo: str) -> str:
+    return "## ¿La tengo?" if modo == "comprobar" else "## Enseñar moneda nueva"
+
+
+def _instrucciones_captura_para_modo(modo: str) -> str:
+    base = "Sube la foto del anverso (el reverso es opcional, pero ayuda a leer mejor la moneda)."
+    if modo == "comprobar":
+        return (
+            f"{base} Comprobaremos si ya está en tu colección; revisa los campos "
+            "propuestos antes de buscar."
+        )
+    return f"{base} La IA solo propone los campos: revísalos antes de guardar nada."
+
+
+def _titulo_formulario_para_modo(modo: str, *, con_ia: bool) -> str:
+    if modo == "comprobar":
+        if con_ia:
+            return "### ¿La tengo? (propuesta por IA — revisa antes de buscar)"
+        return "### ¿La tengo? — revisa los campos antes de buscar"
+    if con_ia:
+        return "### Moneda nueva (propuesta por IA — revisa antes de guardar)"
+    return "### Nueva moneda"
+
+
+def _botones_formulario_para_modo(modo: str) -> tuple:
+    es_comprobar = modo == "comprobar"
+    return gr.update(visible=not es_comprobar), gr.update(visible=es_comprobar)
+
+
+def _texto_resultado_exacta(existente: Moneda) -> str:
+    return (
+        "## ✅ Ya la tienes\n\n"
+        f"Coincide con lo que ya tienes catalogado: **{_etiqueta_moneda(existente)}**."
+    )
+
+
+def _texto_resultado_ninguna() -> str:
+    return (
+        "## 🆕 No la tienes\n\n"
+        "No hay ningún tipo igual en tu colección. Puedes guardarla como nueva."
+    )
+
+
+def _texto_resultado_parcial(posibles: list[Moneda]) -> str:
+    lineas = "\n".join(f"- {_etiqueta_moneda(m)}" for m in posibles)
+    return (
+        "## 🤔 Posible coincidencia\n\n"
+        "Hay uno o más tipos parecidos en tu colección, pero no coinciden con "
+        "seguridad en los 5 campos (revisa año, ceca o variante, o algún campo "
+        "propuesto por la IA era dudoso). Decide tú si es la misma moneda:\n\n"
+        f"{lineas}"
+    )
+
+
 def _guardar_fotos(
     moneda_id: int,
     foto_anverso_img,
@@ -174,13 +259,15 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                     boton_ir_enseñar = gr.Button(
                         "📖  Enseñar moneda nueva", variant="primary", size="lg"
                     )
-                    gr.Button("🔎  ¿La tengo?", variant="secondary", size="lg")
+                    boton_ir_comprobar = gr.Button("🔎  ¿La tengo?", variant="secondary", size="lg")
                 if not config.hay_ia():
                     gr.Markdown(_AVISO_SIN_IA)
 
             with gr.Tab("📚 Colección", id="coleccion"):
                 id_ficha_actual = gr.State(None)
                 id_en_edicion = gr.State(None)
+                modo_flujo = gr.State("nueva")
+                id_resultado_exacta = gr.State(None)
 
                 with gr.Group(visible=True) as panel_lista:
                     gr.Markdown("## Colección")
@@ -213,12 +300,8 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                     )
 
                 with gr.Group(visible=False) as panel_captura:
-                    gr.Markdown("## Enseñar moneda nueva")
-                    gr.Markdown(
-                        "Sube la foto del anverso (el reverso es opcional, pero ayuda a leer "
-                        "mejor la moneda). La IA solo propone los campos: revísalos antes de "
-                        "guardar nada."
-                    )
+                    titulo_captura = gr.Markdown("## Enseñar moneda nueva")
+                    instrucciones_captura = gr.Markdown(_instrucciones_captura_para_modo("nueva"))
                     with gr.Row():
                         captura_anverso = gr.Image(label="Foto anverso", type="pil")
                         captura_reverso = gr.Image(label="Foto reverso (opcional)", type="pil")
@@ -251,7 +334,39 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                     aviso_formulario = gr.Markdown(visible=False)
                     with gr.Row():
                         boton_guardar = gr.Button("💾 Guardar", variant="primary")
+                        boton_comprobar_bd = gr.Button(
+                            "🔎 Buscar en mi colección", variant="primary", visible=False
+                        )
                         boton_cancelar_formulario = gr.Button("Cancelar")
+
+                with gr.Group(visible=False) as panel_resultado_comprobacion:
+                    resultado_texto = gr.Markdown()
+                    with gr.Row(visible=False) as resultado_fotos_comparacion:
+                        with gr.Column():
+                            gr.Markdown("**Ya en tu colección**")
+                            resultado_foto_existente_anverso = gr.Image(
+                                interactive=False, label="Anverso guardado"
+                            )
+                            resultado_foto_existente_reverso = gr.Image(
+                                interactive=False, label="Reverso guardado"
+                            )
+                        with gr.Column():
+                            gr.Markdown("**Foto que acabas de capturar**")
+                            resultado_foto_capturada_anverso = gr.Image(
+                                interactive=False, label="Tu anverso"
+                            )
+                            resultado_foto_capturada_reverso = gr.Image(
+                                interactive=False, label="Tu reverso"
+                            )
+                    resultado_selector = gr.Dropdown(
+                        label="Ver ficha de…", choices=[], value=None, visible=False
+                    )
+                    with gr.Row():
+                        boton_ver_ficha_resultado = gr.Button("👁️ Ver ficha completa", visible=False)
+                        boton_guardar_de_todos_modos = gr.Button(
+                            "💾 Guardar esta como nueva", variant="primary", visible=False
+                        )
+                        boton_volver_resultado = gr.Button("⬅️ Volver al listado")
 
                 with gr.Group(visible=False) as panel_ficha:
                     ficha_titulo = gr.Markdown()
@@ -368,20 +483,15 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                     foto_anverso_img,
                     foto_reverso_img,
                 ):
-                    pais = (pais or "").strip()
-                    valor_texto = (valor_texto or "").strip()
-                    anio_texto = (anio or "").strip()
-                    error = None
-                    if not pais or not valor_texto:
-                        error = "⚠️ País y valor son obligatorios."
-                    elif anio_texto and not anio_texto.isdigit():
-                        error = "⚠️ El año debe ser un número (déjalo vacío si es ilegible)."
+                    datos, error = _parsear_campos_formulario(
+                        pais, valor_texto, anio, ceca, variante, notas
+                    )
                     if error:
                         aviso = gr.update(visible=True, value=error)
                         return (
-                            gr.update(),
-                            gr.update(),
-                            gr.update(),
+                            gr.update(visible=False),  # panel_lista
+                            gr.update(visible=True),  # panel_formulario
+                            gr.update(visible=False),  # panel_ficha
                             gr.update(),
                             gr.update(),
                             gr.update(),
@@ -391,10 +501,14 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                             gr.update(),
                         )
 
-                    anio_valor = int(anio_texto) if anio_texto else None
-                    ceca = (ceca or "").strip() or None
-                    variante = (variante or "").strip() or None
-                    notas = (notas or "").strip() or None
+                    pais, valor_texto, anio_valor, ceca, variante, notas = (
+                        datos["pais"],
+                        datos["valor_texto"],
+                        datos["anio"],
+                        datos["ceca"],
+                        datos["variante"],
+                        datos["notas"],
+                    )
 
                     try:
                         if id_edicion is None:
@@ -424,9 +538,9 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                     except TipoDuplicadoError as exc:
                         aviso = gr.update(visible=True, value=_texto_duplicado(exc.existente))
                         return (
-                            gr.update(),
-                            gr.update(),
-                            gr.update(),
+                            gr.update(visible=False),  # panel_lista
+                            gr.update(visible=True),  # panel_formulario
+                            gr.update(visible=False),  # panel_ficha
                             gr.update(),
                             gr.update(),
                             gr.update(),
@@ -451,6 +565,127 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                         None,  # id_en_edicion se limpia
                     )
 
+                def _comprobar(
+                    pais, valor_texto, anio, ceca, variante, foto_anverso_img, foto_reverso_img
+                ):
+                    """Consulta "¿la tengo?" (RF-2) con los campos ya confirmados por el humano."""
+                    datos, error = _parsear_campos_formulario(
+                        pais, valor_texto, anio, ceca, variante
+                    )
+                    if error:
+                        return (
+                            gr.update(visible=True),  # panel_formulario
+                            gr.update(visible=False),  # panel_resultado_comprobacion
+                            gr.update(visible=True, value=error),  # aviso_formulario
+                            "",  # resultado_texto
+                            gr.update(visible=False),  # resultado_fotos_comparacion
+                            None,  # resultado_foto_existente_anverso
+                            None,  # resultado_foto_existente_reverso
+                            foto_anverso_img,  # resultado_foto_capturada_anverso
+                            foto_reverso_img,  # resultado_foto_capturada_reverso
+                            gr.update(visible=False, choices=[], value=None),  # resultado_selector
+                            gr.update(visible=False),  # boton_ver_ficha_resultado
+                            gr.update(visible=False),  # boton_guardar_de_todos_modos
+                            None,  # id_resultado_exacta
+                        )
+
+                    categoria, exacta, posibles = coleccion.comprobar_tipo(
+                        pais=datos["pais"],
+                        valor_texto=datos["valor_texto"],
+                        anio=datos["anio"],
+                        ceca=datos["ceca"],
+                        variante=datos["variante"],
+                    )
+
+                    if categoria == "exacta":
+                        foto_e_a = (
+                            str(imagenes.ruta_completa(exacta.foto_anverso))
+                            if exacta.foto_anverso
+                            else None
+                        )
+                        foto_e_r = (
+                            str(imagenes.ruta_completa(exacta.foto_reverso))
+                            if exacta.foto_reverso
+                            else None
+                        )
+                        return (
+                            gr.update(visible=False),
+                            gr.update(visible=True),
+                            gr.update(visible=False, value=""),
+                            _texto_resultado_exacta(exacta),
+                            gr.update(visible=True),
+                            foto_e_a,
+                            foto_e_r,
+                            foto_anverso_img,
+                            foto_reverso_img,
+                            gr.update(visible=False, choices=[], value=None),
+                            gr.update(visible=True),
+                            gr.update(visible=False),
+                            exacta.id,
+                        )
+
+                    if categoria == "parcial":
+                        return (
+                            gr.update(visible=False),
+                            gr.update(visible=True),
+                            gr.update(visible=False, value=""),
+                            _texto_resultado_parcial(posibles),
+                            gr.update(visible=False),
+                            None,
+                            None,
+                            foto_anverso_img,
+                            foto_reverso_img,
+                            gr.update(
+                                visible=True, choices=_opciones_selector(posibles), value=None
+                            ),
+                            gr.update(visible=False),
+                            gr.update(visible=True),
+                            None,
+                        )
+
+                    return (
+                        gr.update(visible=False),
+                        gr.update(visible=True),
+                        gr.update(visible=False, value=""),
+                        _texto_resultado_ninguna(),
+                        gr.update(visible=False),
+                        None,
+                        None,
+                        foto_anverso_img,
+                        foto_reverso_img,
+                        gr.update(visible=False, choices=[], value=None),
+                        gr.update(visible=False),
+                        gr.update(visible=True),
+                        None,
+                    )
+
+                def _guardar_desde_resultado(
+                    pais,
+                    valor_texto,
+                    anio,
+                    ceca,
+                    variante,
+                    notas,
+                    estado,
+                    foto_anverso_img,
+                    foto_reverso_img,
+                ):
+                    """ "No la tienes" / "posible coincidencia" -> guardar de todos modos
+                    (RF-5), reutilizando los mismos campos ya confirmados en el formulario."""
+                    resultado = _guardar(
+                        None,
+                        pais,
+                        valor_texto,
+                        anio,
+                        ceca,
+                        variante,
+                        notas,
+                        estado,
+                        foto_anverso_img,
+                        foto_reverso_img,
+                    )
+                    return (*resultado, gr.update(visible=False))
+
                 def _cancelar_formulario(id_edicion):
                     if id_edicion is not None:
                         return _abrir_ficha(id_edicion)
@@ -473,6 +708,7 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                         gr.update(visible=False),  # panel_formulario
                         gr.update(visible=False),  # panel_ficha
                         gr.update(visible=False),  # panel_confirmar_borrado
+                        gr.update(visible=False),  # panel_resultado_comprobacion
                         _filas_tabla(monedas),
                         gr.update(choices=_opciones_selector(monedas), value=None),
                     )
@@ -493,12 +729,14 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                         gr.update(visible=False),  # panel_formulario
                         gr.update(visible=False),  # panel_ficha
                         gr.update(visible=False),  # panel_confirmar_borrado
+                        gr.update(visible=False),  # panel_resultado_comprobacion
                         _filas_tabla(monedas),
                         gr.update(choices=_opciones_selector(monedas), value=None),
                     )
 
-                def _leer_con_ia(imagen_anverso, imagen_reverso):
-                    """Llama a CoinReader.leer() y abre el formulario prerrellenado (RF-1)."""
+                def _leer_con_ia(imagen_anverso, imagen_reverso, modo):
+                    """Llama a CoinReader.leer() y abre el formulario prerrellenado
+                    (RF-1 en modo "nueva", RF-2 en modo "comprobar")."""
                     datos_anverso = _imagen_a_bytes(imagen_anverso)
                     if datos_anverso is None:
                         return (
@@ -516,17 +754,20 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                             gr.update(),  # campo_foto_reverso
                             gr.update(),  # aviso_formulario
                             gr.update(),  # id_en_edicion
+                            gr.update(),  # boton_guardar
+                            gr.update(),  # boton_comprobar_bd
                             gr.update(visible=True, value="⚠️ Sube al menos la foto del anverso."),
                         )
 
                     datos_reverso = _imagen_a_bytes(imagen_reverso)
                     lectura = ClaudeCoinReader().leer(datos_anverso, datos_reverso)
                     dudosos = lectura.campos_dudosos
+                    boton_guardar_u, boton_comprobar_u = _botones_formulario_para_modo(modo)
 
                     return (
                         gr.update(visible=False),  # panel_captura
                         gr.update(visible=True),  # panel_formulario
-                        "### Moneda nueva (propuesta por IA — revisa antes de guardar)",
+                        _titulo_formulario_para_modo(modo, con_ia=True),
                         _campo_ia(lectura.pais, "pais", dudosos),
                         _campo_ia(lectura.valor, "valor", dudosos),
                         _campo_ia(
@@ -542,31 +783,61 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                         imagen_reverso,
                         gr.update(visible=True, value=_aviso_lectura_ia(lectura)),
                         None,  # id_en_edicion
+                        boton_guardar_u,
+                        boton_comprobar_u,
                         gr.update(visible=False, value=""),  # aviso_captura
                     )
 
-                def _abrir_captura_manual():
+                def _abrir_captura_manual(modo):
                     """Botón "rellenar a mano": formulario en blanco, sin pasar por la IA."""
                     # panel_ficha no está en _salidas_formulario_ia: ya está oculto y
                     # este flujo no lo toca, así que se descarta junto con panel_lista.
                     _, panel_formulario_u, _panel_ficha_u, *resto = _abrir_formulario_nuevo()
+                    (
+                        _titulo_en_blanco,
+                        pais,
+                        valor,
+                        anio,
+                        ceca,
+                        variante,
+                        estado,
+                        notas,
+                        foto_a,
+                        foto_r,
+                        aviso,
+                        id_edicion,
+                    ) = resto
+                    boton_guardar_u, boton_comprobar_u = _botones_formulario_para_modo(modo)
                     return (
                         gr.update(visible=False),  # panel_captura
                         panel_formulario_u,
-                        *resto,
+                        _titulo_formulario_para_modo(modo, con_ia=False),
+                        pais,
+                        valor,
+                        anio,
+                        ceca,
+                        variante,
+                        estado,
+                        notas,
+                        foto_a,
+                        foto_r,
+                        aviso,
+                        id_edicion,
+                        boton_guardar_u,
+                        boton_comprobar_u,
                     )
 
-                def _preparar_enseñar():
-                    """Botón "Enseñar moneda nueva" de Inicio: abre la captura para IA,
-                    o el formulario en blanco si no hay IA (RF-6). Se ejecuta después de
-                    cambiar de pestaña (ver ``.then()`` más abajo): si el cambio de panel
-                    va en la misma llamada que el cambio de pestaña, Gradio a veces
-                    ignora la actualización a ``visible=False`` de un panel que ya
-                    estaba visible en la pestaña de origen.
+                def _preparar_flujo(modo: str):
+                    """Botones "Enseñar moneda nueva"/"¿La tengo?" de Inicio: abre la
+                    captura para IA, o el formulario en blanco si no hay IA (RF-6). Se
+                    ejecuta después de cambiar de pestaña (ver ``.then()`` más abajo): si
+                    el cambio de panel va en la misma llamada que el cambio de pestaña,
+                    Gradio a veces ignora la actualización a ``visible=False`` de un panel
+                    que ya estaba visible en la pestaña de origen.
                     """
                     # Reutiliza el reseteo de campos de un formulario en blanco; solo
-                    # cambian qué paneles quedan visibles según haya IA o no.
-                    _, _, _, titulo, pais, valor, anio, ceca, variante, estado, *resto = (
+                    # cambian qué paneles quedan visibles y los textos según el modo.
+                    _, _, _, _, pais, valor, anio, ceca, variante, estado, *resto = (
                         _abrir_formulario_nuevo()
                     )
                     notas, foto_a, foto_r, aviso, id_edicion = resto
@@ -584,9 +855,13 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                             gr.update(visible=True),  # panel_formulario
                             gr.update(visible=False),  # panel_ficha
                         )
+                    boton_guardar_u, boton_comprobar_u = _botones_formulario_para_modo(modo)
                     return (
                         *paneles,
-                        titulo,
+                        gr.update(visible=False),  # panel_resultado_comprobacion
+                        _titulo_captura_para_modo(modo),
+                        _instrucciones_captura_para_modo(modo),
+                        _titulo_formulario_para_modo(modo, con_ia=False),
                         pais,
                         valor,
                         anio,
@@ -598,7 +873,16 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                         foto_r,
                         aviso,
                         id_edicion,
+                        modo,
+                        boton_guardar_u,
+                        boton_comprobar_u,
                     )
+
+                def _preparar_enseñar():
+                    return _preparar_flujo("nueva")
+
+                def _preparar_comprobar():
+                    return _preparar_flujo("comprobar")
 
                 boton_buscar.click(
                     _buscar,
@@ -628,6 +912,9 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                         aviso_formulario,
                         id_en_edicion,
                     ],
+                ).then(
+                    lambda: ("nueva", *_botones_formulario_para_modo("nueva")),
+                    outputs=[modo_flujo, boton_guardar, boton_comprobar_bd],
                 )
                 selector.change(
                     _abrir_ficha,
@@ -663,6 +950,9 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                         aviso_formulario,
                         id_en_edicion,
                     ],
+                ).then(
+                    lambda: ("nueva", *_botones_formulario_para_modo("nueva")),
+                    outputs=[modo_flujo, boton_guardar, boton_comprobar_bd],
                 )
                 boton_guardar.click(
                     _guardar,
@@ -711,6 +1001,7 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                     panel_formulario,
                     panel_ficha,
                     panel_confirmar_borrado,
+                    panel_resultado_comprobacion,
                     tabla,
                     selector,
                 ]
@@ -738,20 +1029,147 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                     campo_foto_reverso,
                     aviso_formulario,
                     id_en_edicion,
+                    boton_guardar,
+                    boton_comprobar_bd,
                 ]
                 boton_leer_ia.click(
                     _leer_con_ia,
-                    inputs=[captura_anverso, captura_reverso],
+                    inputs=[captura_anverso, captura_reverso, modo_flujo],
                     outputs=[*_salidas_formulario_ia, aviso_captura],
                 )
                 boton_manual_en_vez.click(
                     _abrir_captura_manual,
+                    inputs=[modo_flujo],
                     outputs=_salidas_formulario_ia,
                 )
                 boton_cancelar_captura.click(
                     _volver_al_listado,
                     outputs=paneles_y_lista,
                 )
+
+                _salidas_resultado_comprobacion = [
+                    panel_formulario,
+                    panel_resultado_comprobacion,
+                    aviso_formulario,
+                    resultado_texto,
+                    resultado_fotos_comparacion,
+                    resultado_foto_existente_anverso,
+                    resultado_foto_existente_reverso,
+                    resultado_foto_capturada_anverso,
+                    resultado_foto_capturada_reverso,
+                    resultado_selector,
+                    boton_ver_ficha_resultado,
+                    boton_guardar_de_todos_modos,
+                    id_resultado_exacta,
+                ]
+                boton_comprobar_bd.click(
+                    _comprobar,
+                    inputs=[
+                        campo_pais,
+                        campo_valor,
+                        campo_anio,
+                        campo_ceca,
+                        campo_variante,
+                        campo_foto_anverso,
+                        campo_foto_reverso,
+                    ],
+                    outputs=_salidas_resultado_comprobacion,
+                )
+
+                _salidas_ficha_desde_resultado = [
+                    panel_lista,
+                    panel_formulario,
+                    panel_ficha,
+                    ficha_titulo,
+                    ficha_foto_anverso,
+                    ficha_foto_reverso,
+                    ficha_detalles,
+                    id_ficha_actual,
+                ]
+                boton_ver_ficha_resultado.click(
+                    _abrir_ficha,
+                    inputs=[id_resultado_exacta],
+                    outputs=_salidas_ficha_desde_resultado,
+                ).then(
+                    lambda: gr.update(visible=False),
+                    outputs=[panel_resultado_comprobacion],
+                )
+
+                def _ver_ficha_desde_resultado(moneda_id):
+                    # ``_comprobar`` fuerza el desplegable a ``value=None`` al
+                    # mostrar/ocultar resultados, y eso también dispara este
+                    # ``.change`` (Gradio lo hace en cualquier gr.update con
+                    # ``value``, no solo en una selección real del humano). Sin
+                    # este no-op, ese reseteo interno ocultaría el propio panel
+                    # de resultado que acabamos de mostrar.
+                    if moneda_id is None:
+                        return (gr.update(),) * len(_salidas_ficha_desde_resultado)
+                    return _abrir_ficha(moneda_id)
+
+                resultado_selector.change(
+                    _ver_ficha_desde_resultado,
+                    inputs=[resultado_selector],
+                    outputs=_salidas_ficha_desde_resultado,
+                ).then(
+                    lambda moneda_id: (
+                        gr.update(visible=False) if moneda_id is not None else gr.update()
+                    ),
+                    inputs=[resultado_selector],
+                    outputs=[panel_resultado_comprobacion],
+                )
+                boton_guardar_de_todos_modos.click(
+                    _guardar_desde_resultado,
+                    inputs=[
+                        campo_pais,
+                        campo_valor,
+                        campo_anio,
+                        campo_ceca,
+                        campo_variante,
+                        campo_notas,
+                        campo_estado,
+                        campo_foto_anverso,
+                        campo_foto_reverso,
+                    ],
+                    outputs=[
+                        panel_lista,
+                        panel_formulario,
+                        panel_ficha,
+                        ficha_titulo,
+                        ficha_foto_anverso,
+                        ficha_foto_reverso,
+                        ficha_detalles,
+                        aviso_formulario,
+                        id_ficha_actual,
+                        id_en_edicion,
+                        panel_resultado_comprobacion,
+                    ],
+                )
+                boton_volver_resultado.click(_volver_al_listado, outputs=paneles_y_lista)
+
+        _salidas_preparar_flujo = [
+            panel_lista,
+            panel_captura,
+            panel_formulario,
+            panel_ficha,
+            panel_resultado_comprobacion,
+            titulo_captura,
+            instrucciones_captura,
+            titulo_formulario,
+            campo_pais,
+            campo_valor,
+            campo_anio,
+            campo_ceca,
+            campo_variante,
+            campo_estado,
+            campo_notas,
+            campo_foto_anverso,
+            campo_foto_reverso,
+            aviso_formulario,
+            id_en_edicion,
+            modo_flujo,
+            boton_guardar,
+            boton_comprobar_bd,
+        ]
 
         # Dos pasos encadenados a propósito: cambiar de pestaña y ocultar/mostrar
         # paneles en la misma llamada hace que Gradio ignore a veces el cambio a
@@ -762,24 +1180,14 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
             outputs=[pestañas],
         ).then(
             _preparar_enseñar,
-            outputs=[
-                panel_lista,
-                panel_captura,
-                panel_formulario,
-                panel_ficha,
-                titulo_formulario,
-                campo_pais,
-                campo_valor,
-                campo_anio,
-                campo_ceca,
-                campo_variante,
-                campo_estado,
-                campo_notas,
-                campo_foto_anverso,
-                campo_foto_reverso,
-                aviso_formulario,
-                id_en_edicion,
-            ],
+            outputs=_salidas_preparar_flujo,
+        )
+        boton_ir_comprobar.click(
+            lambda: gr.Tabs(selected="coleccion"),
+            outputs=[pestañas],
+        ).then(
+            _preparar_comprobar,
+            outputs=_salidas_preparar_flujo,
         )
 
     return app

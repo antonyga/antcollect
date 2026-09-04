@@ -145,3 +145,91 @@ def test_listar_busca_tambien_en_notas():
 
     assert len(coleccion.listar(texto="abuela")) == 1
     assert len(coleccion.listar(texto="inexistente")) == 0
+
+
+def test_comprobar_tipo_exacta():
+    guardada = _crear_2_euros_espana()
+
+    categoria, exacta, posibles = coleccion.comprobar_tipo(
+        pais="ESPAÑA", valor_texto="2 Euros", anio=2002, ceca=None, variante=None
+    )
+
+    assert categoria == "exacta"
+    assert exacta.id == guardada.id
+    assert posibles == []
+
+
+def test_comprobar_tipo_exacta_es_insensible_a_mayusculas_y_acentos():
+    _crear_2_euros_espana(ceca="Madrid")
+
+    categoria, exacta, _ = coleccion.comprobar_tipo(
+        pais="España", valor_texto="2 euros", anio=2002, ceca="MADRID", variante=None
+    )
+
+    assert categoria == "exacta"
+    assert exacta is not None
+
+
+def test_comprobar_tipo_con_campo_dudoso_nunca_da_exacta():
+    _crear_2_euros_espana()
+
+    categoria, exacta, posibles = coleccion.comprobar_tipo(
+        pais="España",
+        valor_texto="2 euros",
+        anio=2002,
+        ceca=None,
+        variante=None,
+        campos_dudosos=["ceca"],
+    )
+
+    assert categoria == "parcial"
+    assert exacta is None
+    assert len(posibles) == 1
+
+
+def test_comprobar_tipo_distinta_ceca_es_parcial():
+    _crear_2_euros_espana(ceca="M")
+
+    categoria, exacta, posibles = coleccion.comprobar_tipo(
+        pais="España", valor_texto="2 euros", anio=2002, ceca="S", variante=None
+    )
+
+    assert categoria == "parcial"
+    assert exacta is None
+    assert len(posibles) == 1
+    assert posibles[0].ceca == "M"
+
+
+def test_comprobar_tipo_anio_null_en_consulta_es_parcial_no_falso_positivo():
+    _crear_2_euros_espana()
+
+    categoria, exacta, posibles = coleccion.comprobar_tipo(
+        pais="España", valor_texto="2 euros", anio=None, ceca=None, variante=None
+    )
+
+    assert categoria == "parcial"
+    assert exacta is None
+    assert len(posibles) == 1
+
+
+def test_comprobar_tipo_anio_null_en_bd_aparece_como_posible():
+    _crear_2_euros_espana(anio=None)
+
+    categoria, exacta, posibles = coleccion.comprobar_tipo(
+        pais="España", valor_texto="2 euros", anio=2002, ceca=None, variante=None
+    )
+
+    assert categoria == "parcial"
+    assert len(posibles) == 1
+
+
+def test_comprobar_tipo_sin_coincidencia():
+    _crear_2_euros_espana()
+
+    categoria, exacta, posibles = coleccion.comprobar_tipo(
+        pais="Francia", valor_texto="1 euro", anio=2010, ceca=None, variante=None
+    )
+
+    assert categoria == "ninguna"
+    assert exacta is None
+    assert posibles == []

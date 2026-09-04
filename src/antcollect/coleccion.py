@@ -132,6 +132,71 @@ def existe_tipo_exacto(
     return Moneda.desde_fila(fila) if fila else None
 
 
+def buscar_posibles_coincidencias(
+    pais: str | None,
+    valor_texto: str | None,
+    anio: int | str | None,
+) -> list[Moneda]:
+    """Candidatos del mismo país+valor para que decida el humano (RF-2).
+
+    Incluye monedas con ``anio`` NULL en la BD (podría ser la misma con año
+    ilegible en su día). Si el año consultado es conocido, se limita a ese año
+    o a NULL; si es desconocido, se listan todas las del mismo país+valor sin
+    filtrar por año (un año ilegible no permite descartar ninguna).
+    """
+    anio_norm = normalizar_anio(anio)
+    norm = campos_normalizados(pais, valor_texto, None, None)
+    sql = "SELECT * FROM monedas WHERE pais_norm = ? AND valor_norm = ?"
+    parametros: list[object] = [norm["pais_norm"], norm["valor_norm"]]
+    if anio_norm is not None:
+        sql += " AND (anio = ? OR anio IS NULL)"
+        parametros.append(anio_norm)
+    sql += " ORDER BY anio, ceca_norm, variante_norm"
+
+    con = db.conectar()
+    try:
+        filas = con.execute(sql, parametros).fetchall()
+    finally:
+        con.close()
+    return [Moneda.desde_fila(fila) for fila in filas]
+
+
+def comprobar_tipo(
+    *,
+    pais: str | None,
+    valor_texto: str | None,
+    anio: int | str | None,
+    ceca: str | None,
+    variante: str | None,
+    campos_dudosos: list[str] | None = None,
+) -> tuple[str, Moneda | None, list[Moneda]]:
+    """Responde "¿la tengo?" (RF-2) sobre los campos propuestos/confirmados.
+
+    Devuelve una tupla ``(categoria, exacta, posibles)``:
+
+    - ``"exacta"``: coincidencia exacta en los 5 campos, sin campos dudosos y
+      con año conocido → ``exacta`` es la moneda ya catalogada, ``posibles``
+      vacío.
+    - ``"parcial"``: hay candidatos del mismo país+valor pero no se puede
+      confirmar automáticamente (distinta ceca/variante, año NULL en la
+      consulta o en la BD, o algún campo venía dudoso de la IA) → decide el
+      humano viendo ``posibles``.
+    - ``"ninguna"``: no hay ningún candidato parecido en la colección.
+    """
+    dudosos = campos_dudosos or []
+    anio_norm = normalizar_anio(anio)
+
+    if anio_norm is not None and not dudosos:
+        exacta = existe_tipo_exacto(pais, valor_texto, anio_norm, ceca, variante)
+        if exacta is not None:
+            return "exacta", exacta, []
+
+    posibles = buscar_posibles_coincidencias(pais, valor_texto, anio_norm)
+    if posibles:
+        return "parcial", None, posibles
+    return "ninguna", None, []
+
+
 def crear(
     *,
     pais: str,
