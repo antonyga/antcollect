@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from . import config
 from .db import inicializar
 from .ui.app import lanzar
 
 
 def main() -> None:
+    config.configurar_logging()
     inicializar()
     lanzar()
 
