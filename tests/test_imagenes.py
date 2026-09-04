@@ -8,7 +8,7 @@ from antcollect import config, imagenes
 from antcollect.modelo import Moneda
 
 
-def _moneda(id_, foto_anverso=None, foto_reverso=None) -> Moneda:
+def _moneda(id_, foto_anverso=None, foto_reverso=None, foto_detalle=None) -> Moneda:
     return Moneda(
         id=id_,
         pais="España",
@@ -20,6 +20,7 @@ def _moneda(id_, foto_anverso=None, foto_reverso=None) -> Moneda:
         estado="en_coleccion",
         foto_anverso=foto_anverso,
         foto_reverso=foto_reverso,
+        foto_detalle=foto_detalle,
         fecha_agregada="2026-01-01T00:00:00",
         pais_norm="espana",
         valor_norm="2 euros",
@@ -53,12 +54,14 @@ def test_borrar_imagenes_elimina_ficheros_existentes(tmp_path, monkeypatch):
     imagen = Image.new("RGB", (10, 10))
     nombre_anverso = imagenes.guardar_imagen(imagen, 1, "anverso")
     nombre_reverso = imagenes.guardar_imagen(imagen, 1, "reverso")
-    moneda = _moneda(1, nombre_anverso, nombre_reverso)
+    nombre_detalle = imagenes.guardar_imagen(imagen, 1, "detalle")
+    moneda = _moneda(1, nombre_anverso, nombre_reverso, nombre_detalle)
 
     imagenes.borrar_imagenes(moneda)
 
     assert not imagenes.ruta_completa(nombre_anverso).exists()
     assert not imagenes.ruta_completa(nombre_reverso).exists()
+    assert not imagenes.ruta_completa(nombre_detalle).exists()
 
 
 def test_borrar_imagenes_sin_fotos_no_falla(tmp_path, monkeypatch):

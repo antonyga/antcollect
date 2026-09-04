@@ -1,4 +1,4 @@
-"""Guardado de imágenes de monedas (anverso/reverso) en disco.
+"""Guardado de imágenes de monedas (anverso/reverso/detalle) en disco.
 
 Los ficheros se nombran a partir del id de la moneda para trazabilidad
 (RNF-2): ``0001_anverso.jpg``. Se redimensionan con Pillow antes de guardar
@@ -19,7 +19,7 @@ from . import config
 if TYPE_CHECKING:
     from .modelo import Moneda
 
-Cara = Literal["anverso", "reverso"]
+Cara = Literal["anverso", "reverso", "detalle"]
 
 
 def _nombre_archivo(moneda_id: int, cara: Cara) -> str:
@@ -52,7 +52,7 @@ def guardar_imagen(imagen: Image.Image, moneda_id: int, cara: Cara) -> str:
 
 def borrar_imagenes(moneda: Moneda) -> None:
     """Borra del disco las fotos asociadas a una moneda, si existen."""
-    for nombre in (moneda.foto_anverso, moneda.foto_reverso):
+    for nombre in (moneda.foto_anverso, moneda.foto_reverso, moneda.foto_detalle):
         if not nombre:
             continue
         ruta_completa(nombre).unlink(missing_ok=True)

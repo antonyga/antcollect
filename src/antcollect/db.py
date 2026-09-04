@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS monedas (
     estado          TEXT NOT NULL DEFAULT 'en_coleccion',
     foto_anverso    TEXT,
     foto_reverso    TEXT,
+    foto_detalle    TEXT,
     fecha_agregada  TEXT NOT NULL,
 
     pais_norm       TEXT NOT NULL,
@@ -51,10 +52,17 @@ def conectar() -> sqlite3.Connection:
 
 
 def inicializar() -> None:
-    """Crea el esquema si no existe. Idempotente."""
+    """Crea el esquema si no existe, y migra bases de datos de fases anteriores.
+
+    Sin framework de migraciones (RNF-8): basta con comprobar columnas nuevas
+    vía ``PRAGMA table_info`` y añadirlas con ``ALTER TABLE`` si faltan.
+    """
     con = conectar()
     try:
         con.executescript(ESQUEMA)
+        columnas = {fila["name"] for fila in con.execute("PRAGMA table_info(monedas)")}
+        if "foto_detalle" not in columnas:
+            con.execute("ALTER TABLE monedas ADD COLUMN foto_detalle TEXT")
         con.commit()
     finally:
         con.close()

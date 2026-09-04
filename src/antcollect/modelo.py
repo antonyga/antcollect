@@ -25,6 +25,7 @@ class Moneda:
     estado: str
     foto_anverso: str | None
     foto_reverso: str | None
+    foto_detalle: str | None
     fecha_agregada: str
     pais_norm: str
     valor_norm: str

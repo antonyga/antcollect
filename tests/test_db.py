@@ -51,3 +51,45 @@ def test_transaccion_hace_rollback_ante_error(tmp_path, monkeypatch):
     finally:
         con.close()
     assert total == 0
+
+
+def test_inicializar_migra_bd_de_fase_anterior_sin_foto_detalle(tmp_path, monkeypatch):
+    """Fase 4: una BD creada antes de añadir ``foto_detalle`` se migra sola."""
+    monkeypatch.setattr(config, "DB_PATH", tmp_path / "test.db")
+    monkeypatch.setattr(config, "IMAGENES_DIR", tmp_path / "imagenes")
+
+    con = sqlite3.connect(config.DB_PATH)
+    try:
+        con.executescript(
+            """
+            CREATE TABLE monedas (
+                id INTEGER PRIMARY KEY,
+                pais TEXT NOT NULL,
+                valor_texto TEXT NOT NULL,
+                anio INTEGER,
+                ceca TEXT,
+                variante TEXT,
+                notas TEXT,
+                estado TEXT NOT NULL DEFAULT 'en_coleccion',
+                foto_anverso TEXT,
+                foto_reverso TEXT,
+                fecha_agregada TEXT NOT NULL,
+                pais_norm TEXT NOT NULL,
+                valor_norm TEXT NOT NULL,
+                ceca_norm TEXT NOT NULL DEFAULT '',
+                variante_norm TEXT NOT NULL DEFAULT ''
+            );
+            """
+        )
+        con.commit()
+    finally:
+        con.close()
+
+    db.inicializar()
+
+    con = sqlite3.connect(config.DB_PATH)
+    try:
+        columnas = {r[1] for r in con.execute("PRAGMA table_info(monedas)")}
+    finally:
+        con.close()
+    assert "foto_detalle" in columnas
