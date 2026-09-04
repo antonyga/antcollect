@@ -9,7 +9,7 @@
 
 ---
 
-## Fase actual: **1 — Núcleo de datos + CRUD manual**
+## Fase actual: **2 — Lectura por IA (`CoinReader`)**
 
 ---
 
@@ -34,22 +34,24 @@ Objetivo: el proyecto arranca y sirve una página vacía. Infra y control de ver
 
 ---
 
-## Fase 1 — Núcleo de datos + CRUD manual  ·  rama `feat/fase-1-crud`
+## Fase 1 — Núcleo de datos + CRUD manual  ·  rama `feat/fase-1-crud`  ·  ✅ completada
 
 Cubre: RF-6, RF-7, RF-9, RF-10, RF-11, RF-12, RF-14. Sin IA.
 
-- [ ] `modelo.py`: dataclass `Moneda`
-- [ ] `normalizacion.py`: minúsculas + sin acentos + espacios colapsados para `pais`/`ceca`/`variante`; `NULL`→`''` en `ceca`/`variante`; forma canónica de `valor` (`valor_texto` para mostrar, `valor_norm` para comparar); `anio` entero o `NULL`. Tests.
-- [ ] `coleccion.py`: alta, edición, borrado (con confirmación), búsqueda de texto, filtro por país/valor/año
-- [ ] Detección de duplicados (RF-14): al dar de alta, si ya existe un tipo con los mismos campos normalizados → aviso antes de crear. Tests (exacto / parcial / distinto).
-- [ ] `imagenes.py`: guardar anverso y reverso (ambos opcionales), nombres derivados del `id`, redimensionado razonable para almacenamiento
-- [ ] UI: formulario de alta/edición manual con todos los campos
-- [ ] UI: listado/galería de la colección con filtros y búsqueda (RF-9)
-- [ ] UI: ficha de detalle de un tipo (RF-10) — campos, fotos, notas, estado
-- [ ] UI: borrar con confirmación (RF-11)
-- [ ] Campos libres: notas y `estado` (RF-12)
+- [x] `modelo.py`: dataclass `Moneda`
+- [x] `normalizacion.py`: minúsculas + sin acentos + espacios colapsados para `pais`/`ceca`/`variante`; `NULL`→`''` en `ceca`/`variante`; forma canónica de `valor` (`valor_texto` para mostrar, `valor_norm` para comparar); `anio` entero o `NULL`. Tests.
+- [x] `coleccion.py`: alta, edición, borrado (con confirmación), búsqueda de texto, filtro por país/valor/año
+- [x] Detección de duplicados (RF-14): al dar de alta, si ya existe un tipo con los mismos campos normalizados → aviso antes de crear. Tests (exacto / parcial / distinto).
+- [x] `imagenes.py`: guardar anverso y reverso (ambos opcionales), nombres derivados del `id`, redimensionado razonable para almacenamiento
+- [x] UI: formulario de alta/edición manual con todos los campos
+- [x] UI: listado/galería de la colección con filtros y búsqueda (RF-9)
+- [x] UI: ficha de detalle de un tipo (RF-10) — campos, fotos, notas, estado
+- [x] UI: borrar con confirmación (RF-11)
+- [x] Campos libres: notas y `estado` (RF-12)
 
 **Sale usable:** catálogo manual completo y consultable. Ya tiene valor real.
+Probado en navegador con Playwright contra el servidor real: alta con/sin
+foto, año en blanco, aviso de duplicado, edición y borrado con confirmación.
 
 ---
 
