@@ -9,7 +9,7 @@
 
 ---
 
-## Fase actual: **4 — Captura y modos**
+## Fase actual: **5 — Pulido**
 
 ---
 
@@ -103,16 +103,34 @@ del formulario a "Guardar" (no se queda en "Buscar").
 
 ---
 
-## Fase 4 — Captura y modos  ·  rama `feat/fase-4-captura`
+## Fase 4 — Captura y modos  ·  rama `feat/fase-4-captura`  ·  ✅ completada
 
 Cubre: RF-8, §9.3 del doc.
 
-- [ ] Selección de fuente de cámara cuando hay varias (webcam normal vs microscopio Jiusion UVC) en escritorio
-- [ ] Modo *completa* (foto entera → es la que va a la IA) y modo *detalle/macro* (microscopio → apoyo humano para cecas/variantes; opcional guardar como imágenes adicionales)
-- [ ] Captura desde la cámara del móvil (`<input capture>` / widget de Gradio)
-- [ ] No permitir un macro extremo como única entrada de la IA
+- [x] Selección de fuente de cámara cuando hay varias (webcam normal vs microscopio Jiusion UVC) en escritorio — `gr.Image` de Gradio ya enumera los dispositivos de vídeo disponibles y deja elegir entre ellos al abrir la pestaña "Webcam"; no hace falta un selector propio.
+- [x] Modo *completa* (foto entera → es la que va a la IA) y modo *detalle/macro* (microscopio → apoyo humano para cecas/variantes; opcional guardar como imagen adicional): tercer campo `foto_detalle`, independiente de anverso/reverso, en captura, formulario y ficha. Nueva columna `foto_detalle` en `monedas` (migración automática vía `ALTER TABLE` para bases ya existentes).
+- [x] Captura desde la cámara del móvil: mismo widget `gr.Image` con `webcam_options` (`facingMode: environment` para la cámara trasera, `mirror=False` para no invertir la imagen — una moneda espejada puede leerse mal).
+- [x] No permitir un macro extremo como única entrada de la IA: `foto_detalle` nunca se pasa a `ClaudeCoinReader.leer()` (solo anverso/reverso), y el anverso completo sigue siendo obligatorio para leer.
 
 **Sale usable:** captura directa sin depender de subir archivos a mano.
+Probado en navegador con Playwright contra el servidor real: con clave de API
+inválida (para llegar al panel de captura), los 3 slots de foto (anverso
+completo, reverso completo, detalle/macro) se muestran por separado; "Leer con
+IA" exige el anverso; subir las 3 fotos y leer degrada a manual (clave
+inválida) conservando la foto de detalle en el formulario; guardar persiste
+las 3 fotos y la ficha las muestra; editar reabre con la foto de detalle
+cargada; "¿La tengo?" también ofrece el slot de detalle. Sin
+`ANTHROPIC_API_KEY` (modo manual directo), el formulario en blanco también
+trae el campo de detalle y permite guardar solo con foto de detalle (sin
+anverso/reverso).
+
+**Sin probar con hardware real** (no disponible en este entorno): la
+selección real de cámara con un microscopio Jiusion USB conectado, y la
+captura desde un móvil físico. La implementación usa las mismas APIs del
+navegador (`getUserMedia` + `enumerateDevices`) que ya usaba el resto de la
+app para foto/reverso desde la Fase 2, así que el comportamiento debería ser
+el mismo; pendiente de que el usuario lo confirme con el microscopio y un
+móvil reales.
 
 ---
 
@@ -152,3 +170,5 @@ Cubre: RF-13, §10, retoques de RF-12 y textos.
 | 2026-09-04 | Git: rama por fase + PR, Conventional Commits en español | CLAUDE.md §8 |
 | 2026-09-04 | Repo: github.com/antonyga/antcollect, público | CLAUDE.md §8 |
 | 2026-09-04 | Modelo IA confirmado: `claude-sonnet-5` sigue vigente | CLAUDE.md §4, PLAN.md Fase 2 |
+| 2026-09-05 | Detalle/macro (RF-8): tercer campo de foto `foto_detalle`, opcional, en su propia columna; nunca se envía a `CoinReader.leer()` | PLAN.md Fase 4, `db.py`/`modelo.py`/`imagenes.py`/`coleccion.py`/`ui/app.py` |
+| 2026-09-05 | Selección de cámara (RF-8): sin selector propio — se apoya en el enumerado nativo de `gr.Image` (Gradio); `webcam_options` con `facingMode: environment` y `mirror=False` para todas las fotos capturables | PLAN.md Fase 4 |

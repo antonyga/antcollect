@@ -24,6 +24,12 @@ _AVISO_SIN_IA = (
     "desactivada. El modo manual funciona sin conexión."
 )
 
+# Cámara trasera por defecto en móvil (no la frontal/selfie) y sin espejar la
+# imagen: una moneda espejada puede leerse mal (ceca, letras). Gradio ya
+# enumera las cámaras disponibles y deja elegir cuando hay varias (webcam +
+# microscopio Jiusion UVC en escritorio), sin necesidad de UI propia (RF-8).
+_OPCIONES_CAMARA = gr.WebcamOptions(mirror=False, constraints={"facingMode": "environment"})
+
 _ESTADOS_ETIQUETAS = [
     ("En colección", modelo.EN_COLECCION),
     ("Duplicada", modelo.DUPLICADA),
@@ -111,7 +117,7 @@ def _opciones_selector(monedas: list[Moneda]) -> list[tuple[str, int]]:
     return [(_etiqueta_moneda(m), m.id) for m in monedas]
 
 
-def _datos_ficha(m: Moneda) -> tuple[str, str | None, str | None, str]:
+def _datos_ficha(m: Moneda) -> tuple[str, str | None, str | None, str | None, str]:
     titulo = f"### {m.pais} — {m.valor_texto}"
     detalles = (
         f"- **Año:** {m.anio if m.anio is not None else 'desconocido'}\n"
@@ -123,7 +129,8 @@ def _datos_ficha(m: Moneda) -> tuple[str, str | None, str | None, str]:
     )
     foto_anverso = str(imagenes.ruta_completa(m.foto_anverso)) if m.foto_anverso else None
     foto_reverso = str(imagenes.ruta_completa(m.foto_reverso)) if m.foto_reverso else None
-    return titulo, foto_anverso, foto_reverso, detalles
+    foto_detalle = str(imagenes.ruta_completa(m.foto_detalle)) if m.foto_detalle else None
+    return titulo, foto_anverso, foto_reverso, foto_detalle, detalles
 
 
 def _texto_duplicado(existente: Moneda) -> str:
@@ -223,22 +230,22 @@ def _guardar_fotos(
     moneda_id: int,
     foto_anverso_img,
     foto_reverso_img,
+    foto_detalle_img,
     anterior: Moneda | None,
 ) -> None:
     """Guarda/borra fotos según lo que haya en el formulario, comparado con lo anterior."""
     cambios: dict[str, str | None] = {}
 
-    if foto_anverso_img is not None:
-        cambios["foto_anverso"] = imagenes.guardar_imagen(foto_anverso_img, moneda_id, "anverso")
-    elif anterior is not None and anterior.foto_anverso:
-        imagenes.ruta_completa(anterior.foto_anverso).unlink(missing_ok=True)
-        cambios["foto_anverso"] = None
-
-    if foto_reverso_img is not None:
-        cambios["foto_reverso"] = imagenes.guardar_imagen(foto_reverso_img, moneda_id, "reverso")
-    elif anterior is not None and anterior.foto_reverso:
-        imagenes.ruta_completa(anterior.foto_reverso).unlink(missing_ok=True)
-        cambios["foto_reverso"] = None
+    for campo, cara, imagen in (
+        ("foto_anverso", "anverso", foto_anverso_img),
+        ("foto_reverso", "reverso", foto_reverso_img),
+        ("foto_detalle", "detalle", foto_detalle_img),
+    ):
+        if imagen is not None:
+            cambios[campo] = imagenes.guardar_imagen(imagen, moneda_id, cara)
+        elif anterior is not None and getattr(anterior, campo):
+            imagenes.ruta_completa(getattr(anterior, campo)).unlink(missing_ok=True)
+            cambios[campo] = None
 
     if cambios:
         coleccion.editar(moneda_id, **cambios)
@@ -303,8 +310,27 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                     titulo_captura = gr.Markdown("## Enseñar moneda nueva")
                     instrucciones_captura = gr.Markdown(_instrucciones_captura_para_modo("nueva"))
                     with gr.Row():
-                        captura_anverso = gr.Image(label="Foto anverso", type="pil")
-                        captura_reverso = gr.Image(label="Foto reverso (opcional)", type="pil")
+                        captura_anverso = gr.Image(
+                            label="Foto anverso (completa)",
+                            type="pil",
+                            webcam_options=_OPCIONES_CAMARA,
+                        )
+                        captura_reverso = gr.Image(
+                            label="Foto reverso (completa, opcional)",
+                            type="pil",
+                            webcam_options=_OPCIONES_CAMARA,
+                        )
+                    gr.Markdown(
+                        "🔬 **Detalle/macro (opcional):** un primer plano (p. ej. con un "
+                        "microscopio USB) para leer mejor una ceca, variante o error. Es "
+                        "solo apoyo para confirmar campos dudosos a simple vista — nunca "
+                        "se envía a la IA ni sustituye a la foto completa de arriba."
+                    )
+                    captura_detalle = gr.Image(
+                        label="Foto de detalle/macro (opcional)",
+                        type="pil",
+                        webcam_options=_OPCIONES_CAMARA,
+                    )
                     aviso_captura = gr.Markdown(visible=False)
                     with gr.Row():
                         boton_leer_ia = gr.Button("🔎 Leer con IA", variant="primary")
@@ -329,8 +355,17 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                         )
                     campo_notas = gr.Textbox(label="Notas", lines=3)
                     with gr.Row():
-                        campo_foto_anverso = gr.Image(label="Foto anverso", type="pil")
-                        campo_foto_reverso = gr.Image(label="Foto reverso", type="pil")
+                        campo_foto_anverso = gr.Image(
+                            label="Foto anverso", type="pil", webcam_options=_OPCIONES_CAMARA
+                        )
+                        campo_foto_reverso = gr.Image(
+                            label="Foto reverso", type="pil", webcam_options=_OPCIONES_CAMARA
+                        )
+                        campo_foto_detalle = gr.Image(
+                            label="Foto de detalle/macro (opcional, apoyo humano)",
+                            type="pil",
+                            webcam_options=_OPCIONES_CAMARA,
+                        )
                     aviso_formulario = gr.Markdown(visible=False)
                     with gr.Row():
                         boton_guardar = gr.Button("💾 Guardar", variant="primary")
@@ -373,6 +408,7 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                     with gr.Row():
                         ficha_foto_anverso = gr.Image(label="Anverso", interactive=False)
                         ficha_foto_reverso = gr.Image(label="Reverso", interactive=False)
+                        ficha_foto_detalle = gr.Image(label="Detalle/macro", interactive=False)
                     ficha_detalles = gr.Markdown()
                     with gr.Row():
                         boton_editar = gr.Button("✏️ Editar")
@@ -421,19 +457,20 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                         gr.update(value="", label=_ETIQUETA_VARIANTE),
                         modelo.EN_COLECCION,
                         "",
-                        None,
-                        None,
+                        None,  # campo_foto_anverso
+                        None,  # campo_foto_reverso
+                        None,  # campo_foto_detalle
                         gr.update(visible=False, value=""),
                         None,  # id_en_edicion
                     )
 
                 def _abrir_ficha(moneda_id):
                     if moneda_id is None:
-                        return (gr.update(),) * 7 + (None,)
+                        return (gr.update(),) * 8 + (None,)
                     m = coleccion.obtener(int(moneda_id))
                     if m is None:
-                        return (gr.update(),) * 7 + (None,)
-                    titulo, foto_a, foto_r, detalles = _datos_ficha(m)
+                        return (gr.update(),) * 8 + (None,)
+                    titulo, foto_a, foto_r, foto_d, detalles = _datos_ficha(m)
                     return (
                         gr.update(visible=False),  # panel_lista
                         gr.update(visible=False),  # panel_formulario
@@ -441,6 +478,7 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                         titulo,
                         foto_a,
                         foto_r,
+                        foto_d,
                         detalles,
                         m.id,
                     )
@@ -448,9 +486,10 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                 def _iniciar_edicion(moneda_id):
                     m = coleccion.obtener(moneda_id) if moneda_id is not None else None
                     if m is None:
-                        return (gr.update(),) * 15
+                        return (gr.update(),) * 16
                     foto_a = str(imagenes.ruta_completa(m.foto_anverso)) if m.foto_anverso else None
                     foto_r = str(imagenes.ruta_completa(m.foto_reverso)) if m.foto_reverso else None
+                    foto_d = str(imagenes.ruta_completa(m.foto_detalle)) if m.foto_detalle else None
                     return (
                         gr.update(visible=False),  # panel_lista
                         gr.update(visible=True),  # panel_formulario
@@ -467,6 +506,7 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                         m.notas or "",
                         foto_a,
                         foto_r,
+                        foto_d,
                         gr.update(visible=False, value=""),
                         m.id,
                     )
@@ -482,6 +522,7 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                     estado,
                     foto_anverso_img,
                     foto_reverso_img,
+                    foto_detalle_img,
                 ):
                     datos, error = _parsear_campos_formulario(
                         pais, valor_texto, anio, ceca, variante, notas
@@ -492,10 +533,11 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                             gr.update(visible=False),  # panel_lista
                             gr.update(visible=True),  # panel_formulario
                             gr.update(visible=False),  # panel_ficha
-                            gr.update(),
-                            gr.update(),
-                            gr.update(),
-                            gr.update(),
+                            gr.update(),  # ficha_titulo
+                            gr.update(),  # ficha_foto_anverso
+                            gr.update(),  # ficha_foto_reverso
+                            gr.update(),  # ficha_foto_detalle
+                            gr.update(),  # ficha_detalles
                             aviso,
                             gr.update(),
                             gr.update(),
@@ -521,7 +563,13 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                                 notas=notas,
                                 estado=estado,
                             )
-                            _guardar_fotos(moneda.id, foto_anverso_img, foto_reverso_img, None)
+                            _guardar_fotos(
+                                moneda.id,
+                                foto_anverso_img,
+                                foto_reverso_img,
+                                foto_detalle_img,
+                                None,
+                            )
                         else:
                             anterior = coleccion.obtener(id_edicion)
                             moneda = coleccion.editar(
@@ -534,24 +582,31 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                                 notas=notas,
                                 estado=estado,
                             )
-                            _guardar_fotos(moneda.id, foto_anverso_img, foto_reverso_img, anterior)
+                            _guardar_fotos(
+                                moneda.id,
+                                foto_anverso_img,
+                                foto_reverso_img,
+                                foto_detalle_img,
+                                anterior,
+                            )
                     except TipoDuplicadoError as exc:
                         aviso = gr.update(visible=True, value=_texto_duplicado(exc.existente))
                         return (
                             gr.update(visible=False),  # panel_lista
                             gr.update(visible=True),  # panel_formulario
                             gr.update(visible=False),  # panel_ficha
-                            gr.update(),
-                            gr.update(),
-                            gr.update(),
-                            gr.update(),
+                            gr.update(),  # ficha_titulo
+                            gr.update(),  # ficha_foto_anverso
+                            gr.update(),  # ficha_foto_reverso
+                            gr.update(),  # ficha_foto_detalle
+                            gr.update(),  # ficha_detalles
                             aviso,
                             gr.update(),
                             gr.update(),
                         )
 
                     moneda = coleccion.obtener(moneda.id)
-                    titulo, foto_a, foto_r, detalles = _datos_ficha(moneda)
+                    titulo, foto_a, foto_r, foto_d, detalles = _datos_ficha(moneda)
                     return (
                         gr.update(visible=False),  # panel_lista
                         gr.update(visible=False),  # panel_formulario
@@ -559,6 +614,7 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                         titulo,
                         foto_a,
                         foto_r,
+                        foto_d,
                         detalles,
                         gr.update(visible=False, value=""),
                         moneda.id,
@@ -669,6 +725,7 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                     estado,
                     foto_anverso_img,
                     foto_reverso_img,
+                    foto_detalle_img,
                 ):
                     """ "No la tienes" / "posible coincidencia" -> guardar de todos modos
                     (RF-5), reutilizando los mismos campos ya confirmados en el formulario."""
@@ -683,6 +740,7 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                         estado,
                         foto_anverso_img,
                         foto_reverso_img,
+                        foto_detalle_img,
                     )
                     return (*resultado, gr.update(visible=False))
 
@@ -693,6 +751,7 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                         gr.update(visible=True),
                         gr.update(visible=False),
                         gr.update(visible=False),
+                        gr.update(),
                         gr.update(),
                         gr.update(),
                         gr.update(),
@@ -734,9 +793,15 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                         gr.update(choices=_opciones_selector(monedas), value=None),
                     )
 
-                def _leer_con_ia(imagen_anverso, imagen_reverso, modo):
+                def _leer_con_ia(imagen_anverso, imagen_reverso, imagen_detalle, modo):
                     """Llama a CoinReader.leer() y abre el formulario prerrellenado
-                    (RF-1 en modo "nueva", RF-2 en modo "comprobar")."""
+                    (RF-1 en modo "nueva", RF-2 en modo "comprobar").
+
+                    La foto de detalle/macro NUNCA se envía a la IA (RF-8): es solo
+                    apoyo humano para confirmar campos dudosos, y la foto "completa"
+                    (anverso) es obligatoria para leer, así que un macro extremo no
+                    puede colarse como única entrada de la lectura.
+                    """
                     datos_anverso = _imagen_a_bytes(imagen_anverso)
                     if datos_anverso is None:
                         return (
@@ -752,6 +817,7 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                             gr.update(),  # campo_notas
                             gr.update(),  # campo_foto_anverso
                             gr.update(),  # campo_foto_reverso
+                            gr.update(),  # campo_foto_detalle
                             gr.update(),  # aviso_formulario
                             gr.update(),  # id_en_edicion
                             gr.update(),  # boton_guardar
@@ -781,6 +847,7 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                         "",
                         imagen_anverso,
                         imagen_reverso,
+                        imagen_detalle,
                         gr.update(visible=True, value=_aviso_lectura_ia(lectura)),
                         None,  # id_en_edicion
                         boton_guardar_u,
@@ -804,6 +871,7 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                         notas,
                         foto_a,
                         foto_r,
+                        foto_d,
                         aviso,
                         id_edicion,
                     ) = resto
@@ -821,6 +889,7 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                         notas,
                         foto_a,
                         foto_r,
+                        foto_d,
                         aviso,
                         id_edicion,
                         boton_guardar_u,
@@ -840,7 +909,7 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                     _, _, _, _, pais, valor, anio, ceca, variante, estado, *resto = (
                         _abrir_formulario_nuevo()
                     )
-                    notas, foto_a, foto_r, aviso, id_edicion = resto
+                    notas, foto_a, foto_r, foto_d, aviso, id_edicion = resto
                     if config.hay_ia():
                         paneles = (
                             gr.update(visible=False),  # panel_lista
@@ -871,6 +940,7 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                         notas,
                         foto_a,
                         foto_r,
+                        foto_d,
                         aviso,
                         id_edicion,
                         modo,
@@ -909,6 +979,7 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                         campo_notas,
                         campo_foto_anverso,
                         campo_foto_reverso,
+                        campo_foto_detalle,
                         aviso_formulario,
                         id_en_edicion,
                     ],
@@ -926,6 +997,7 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                         ficha_titulo,
                         ficha_foto_anverso,
                         ficha_foto_reverso,
+                        ficha_foto_detalle,
                         ficha_detalles,
                         id_ficha_actual,
                     ],
@@ -947,6 +1019,7 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                         campo_notas,
                         campo_foto_anverso,
                         campo_foto_reverso,
+                        campo_foto_detalle,
                         aviso_formulario,
                         id_en_edicion,
                     ],
@@ -967,6 +1040,7 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                         campo_estado,
                         campo_foto_anverso,
                         campo_foto_reverso,
+                        campo_foto_detalle,
                     ],
                     outputs=[
                         panel_lista,
@@ -975,6 +1049,7 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                         ficha_titulo,
                         ficha_foto_anverso,
                         ficha_foto_reverso,
+                        ficha_foto_detalle,
                         ficha_detalles,
                         aviso_formulario,
                         id_ficha_actual,
@@ -991,6 +1066,7 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                         ficha_titulo,
                         ficha_foto_anverso,
                         ficha_foto_reverso,
+                        ficha_foto_detalle,
                         ficha_detalles,
                         id_ficha_actual,
                     ],
@@ -1027,6 +1103,7 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                     campo_notas,
                     campo_foto_anverso,
                     campo_foto_reverso,
+                    campo_foto_detalle,
                     aviso_formulario,
                     id_en_edicion,
                     boton_guardar,
@@ -1034,7 +1111,7 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                 ]
                 boton_leer_ia.click(
                     _leer_con_ia,
-                    inputs=[captura_anverso, captura_reverso, modo_flujo],
+                    inputs=[captura_anverso, captura_reverso, captura_detalle, modo_flujo],
                     outputs=[*_salidas_formulario_ia, aviso_captura],
                 )
                 boton_manual_en_vez.click(
@@ -1083,6 +1160,7 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                     ficha_titulo,
                     ficha_foto_anverso,
                     ficha_foto_reverso,
+                    ficha_foto_detalle,
                     ficha_detalles,
                     id_ficha_actual,
                 ]
@@ -1129,6 +1207,7 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                         campo_estado,
                         campo_foto_anverso,
                         campo_foto_reverso,
+                        campo_foto_detalle,
                     ],
                     outputs=[
                         panel_lista,
@@ -1137,6 +1216,7 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                         ficha_titulo,
                         ficha_foto_anverso,
                         ficha_foto_reverso,
+                        ficha_foto_detalle,
                         ficha_detalles,
                         aviso_formulario,
                         id_ficha_actual,
@@ -1164,6 +1244,7 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
             campo_notas,
             campo_foto_anverso,
             campo_foto_reverso,
+            campo_foto_detalle,
             aviso_formulario,
             id_en_edicion,
             modo_flujo,

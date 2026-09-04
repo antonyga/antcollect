@@ -24,6 +24,7 @@ _CAMPOS_EDITABLES = {
     "estado",
     "foto_anverso",
     "foto_reverso",
+    "foto_detalle",
 }
 
 
@@ -208,6 +209,7 @@ def crear(
     estado: str = modelo.EN_COLECCION,
     foto_anverso: str | None = None,
     foto_reverso: str | None = None,
+    foto_detalle: str | None = None,
 ) -> Moneda:
     """Da de alta un tipo nuevo (RF-6). Lanza :class:`TipoDuplicadoError` si ya existe.
 
@@ -231,9 +233,9 @@ def crear(
                 """
                 INSERT INTO monedas (
                     pais, valor_texto, anio, ceca, variante, notas, estado,
-                    foto_anverso, foto_reverso, fecha_agregada,
+                    foto_anverso, foto_reverso, foto_detalle, fecha_agregada,
                     pais_norm, valor_norm, ceca_norm, variante_norm
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     pais.strip(),
@@ -245,6 +247,7 @@ def crear(
                     estado,
                     foto_anverso,
                     foto_reverso,
+                    foto_detalle,
                     datetime.now(UTC).isoformat(timespec="seconds"),
                     norm["pais_norm"],
                     norm["valor_norm"],
@@ -297,7 +300,7 @@ def editar(moneda_id: int, **cambios: object) -> Moneda:
                 """
                 UPDATE monedas SET
                     pais = ?, valor_texto = ?, anio = ?, ceca = ?, variante = ?, notas = ?,
-                    estado = ?, foto_anverso = ?, foto_reverso = ?,
+                    estado = ?, foto_anverso = ?, foto_reverso = ?, foto_detalle = ?,
                     pais_norm = ?, valor_norm = ?, ceca_norm = ?, variante_norm = ?
                 WHERE id = ?
                 """,
@@ -311,6 +314,7 @@ def editar(moneda_id: int, **cambios: object) -> Moneda:
                     datos["estado"],
                     datos["foto_anverso"],
                     datos["foto_reverso"],
+                    datos["foto_detalle"],
                     norm["pais_norm"],
                     norm["valor_norm"],
                     norm["ceca_norm"],
