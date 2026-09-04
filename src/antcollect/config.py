@@ -31,6 +31,7 @@ LOG_PATH: Path = _ruta("ANTCOLLECT_LOG", "antcollect.log")
 MODELO_IA: str = os.getenv("ANTCOLLECT_MODELO", "claude-sonnet-5")
 ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
 RESIZE_LADO_LARGO: int = int(os.getenv("ANTCOLLECT_RESIZE_LADO_LARGO", "1568"))
+RESIZE_ALMACENAMIENTO: int = int(os.getenv("ANTCOLLECT_RESIZE_ALMACENAMIENTO", "2000"))
 PUERTO: int = int(os.getenv("ANTCOLLECT_PUERTO", "7860"))
 
 
