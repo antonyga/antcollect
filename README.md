@@ -14,7 +14,8 @@ usuario los **confirma o corrige** antes de que nada se guarde.
 
 ## Estado
 
-En construcción — Fase 0 (esqueleto) completada; **Fase 1 (CRUD manual)** en curso. Ver [PLAN.md](PLAN.md).
+Fases 0 a 4 completadas (esqueleto, CRUD manual, lectura por IA, comprobar
+"¿la tengo?", captura y modos). **Fase 5 (pulido)** en curso. Ver [PLAN.md](PLAN.md).
 
 ## Stack
 
@@ -63,7 +64,45 @@ Abre `http://localhost:7860` en el navegador del escritorio.
 
 Con el PC encendido y sirviendo, en la misma red wifi, abre en el navegador del
 móvil `http://<IP-local-del-PC>:7860` (p. ej. `http://192.168.1.42:7860`).
-Para conocer la IP del PC: `ipconfig` (Windows).
+Para conocer la IP del PC: `ipconfig` (Windows). La UI se adapta a pantallas
+estrechas (botones y campos más grandes, cámara trasera por defecto en el móvil).
+
+## Uso
+
+Dos flujos desde la pestaña **Inicio**, ambos con el mismo pipeline
+*capturar → leer → confirmar*:
+
+- **📖 Enseñar moneda nueva** — para catalogar una moneda que no tienes fichada.
+  Termina **guardando** en la colección tras tu confirmación.
+- **🔎 ¿La tengo?** — para comprobar si una moneda que te has encontrado ya está
+  en tu colección. Termina **consultando**: coincidencia exacta, posible
+  coincidencia (revisa tú los detalles) o "no la tienes" con opción de guardarla.
+
+En la captura puedes subir foto, usar la webcam (con selector de fuente si hay
+varias, útil con un microscopio USB para cecas/variantes) o el campo opcional
+de *detalle/macro* como apoyo visual — nunca se envía a la IA, solo la foto
+completa de anverso/reverso.
+
+La IA solo **propone** los campos; tú los confirmas o corriges antes de que se
+guarde nada. Los campos que no pudo leer con seguridad quedan resaltados. Sin
+`ANTHROPIC_API_KEY` configurada, o si la lectura falla, la app pasa
+automáticamente al formulario en blanco (modo manual) sin interrumpir el flujo.
+
+### Estados de la colección
+
+Cada moneda tiene un estado editable: **en colección**, **duplicada** o **para
+intercambio**. Se fija al guardar/editar y se puede filtrar desde el listado.
+
+### Exportar la colección
+
+Desde el listado, los botones **Exportar CSV** y **Exportar JSON** generan un
+volcado de los campos "bonitos" de la colección (sin las columnas internas
+`*_norm`). Nota de uso: el botón de Gradio necesita **dos clics** — el primero
+genera el archivo (la etiqueta cambia a "pulsa para descargar"), el segundo
+dispara la descarga del navegador.
+
+Esto es un export puntual y legible, no sustituye a la copia de seguridad real
+(ver siguiente sección).
 
 ## Copia de seguridad
 
@@ -72,8 +111,8 @@ Toda la información vive en dos sitios dentro de la carpeta del proyecto:
 - `antcollect.db` — la base de datos
 - `imagenes/` — las fotos
 
-Respaldar = copiar esos dos a lugar seguro. Restaurar = volver a copiarlos.
-Ninguno de los dos se sube a git.
+Respaldar = copiar esos dos a lugar seguro. Restaurar = cerrar la app y volver
+a copiarlos a su sitio (sobrescribiendo). Ninguno de los dos se sube a git.
 
 ## Desarrollo
 

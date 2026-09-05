@@ -138,14 +138,36 @@ móvil reales.
 
 Cubre: RF-13, §10, retoques de RF-12 y textos.
 
-- [ ] Responsive / móvil: botones grandes, formularios usables con el pulgar, los 2 botones como pantalla de inicio
-- [ ] Exportación de la colección a CSV y JSON (RF-13)
-- [ ] Backup de imágenes documentado; formato portable; restauración manual (copiar carpeta) documentada
-- [ ] Estados de colección ("en colección" / "duplicada" / "para intercambio")
-- [ ] Repaso de todos los textos de UI: lenguaje de "propuesta", nunca "resultado definitivo"
-- [ ] README completo y verificado
+- [x] Responsive / móvil: CSS propio para pantallas ≤640px (botones/campos más
+  grandes al tacto); Gradio ya reordena en columna. Los 2 botones grandes de
+  Inicio ya venían de fases anteriores.
+- [x] Exportación de la colección a CSV y JSON (RF-13): `exportar.py`
+  (`exportar_csv`/`exportar_json`, sin columnas `*_norm`) + botones en el
+  listado. Nota de UX descubierta al probar: `gr.DownloadButton` en Gradio
+  6.26 necesita **2 clics** (1º genera el archivo y lo convierte en enlace
+  real, 2º descarga) — se cambia la etiqueta del botón tras el 1er clic
+  ("✅ Pulsa para descargar…") para que no parezca que no ha pasado nada.
+- [x] Backup de imágenes documentado; formato portable; restauración manual
+  (copiar carpeta) documentada — README ampliado distinguiendo backup real
+  (`antcollect.db` + `imagenes/`) del export puntual CSV/JSON.
+- [x] Estados de colección ("en colección" / "duplicada" / "para intercambio"):
+  ya existía el selector en alta/edición; se añade filtro por estado en el
+  listado (`coleccion.listar(estado=...)`) y se normalizan las etiquetas
+  mostradas en tabla/ficha/filtro con un único mapeo.
+- [x] Repaso de todos los textos de UI: lenguaje de "propuesta", nunca
+  "resultado definitivo" — ya cumplido desde fases anteriores, revisado de
+  nuevo sin encontrar textos que prometan un resultado definitivo de la IA.
+- [x] README completo y verificado: estado de fases actualizado (0-4
+  completadas), sección "Uso" con los dos flujos, estados de colección y
+  exportación documentados.
 
 **Sale usable:** v1 lista.
+Probado en navegador con Playwright contra el servidor real (BD aislada):
+alta de 2 monedas con distinto estado, filtro del listado por estado
+("Duplicada" devuelve solo esa), limpiar filtros, exportar CSV y JSON
+(comprobando el doble clic y el contenido de los archivos descargados:
+cabeceras esperadas, `anio` NULL como `""`/`null` según formato), y capturas
+de pantalla del listado y el formulario en un viewport móvil (390×844).
 
 ---
 
@@ -172,3 +194,4 @@ Cubre: RF-13, §10, retoques de RF-12 y textos.
 | 2026-09-04 | Modelo IA confirmado: `claude-sonnet-5` sigue vigente | CLAUDE.md §4, PLAN.md Fase 2 |
 | 2026-09-05 | Detalle/macro (RF-8): tercer campo de foto `foto_detalle`, opcional, en su propia columna; nunca se envía a `CoinReader.leer()` | PLAN.md Fase 4, `db.py`/`modelo.py`/`imagenes.py`/`coleccion.py`/`ui/app.py` |
 | 2026-09-05 | Selección de cámara (RF-8): sin selector propio — se apoya en el enumerado nativo de `gr.Image` (Gradio); `webcam_options` con `facingMode: environment` y `mirror=False` para todas las fotos capturables | PLAN.md Fase 4 |
+| 2026-09-05 | Exportación (RF-13): módulo `exportar.py` separado de `coleccion.py`, vuelca solo columnas "bonitas" (nunca `*_norm`) a un archivo temporal; `gr.DownloadButton` requiere 2 clics en Gradio 6.26, se resuelve cambiando la etiqueta tras el 1er clic en vez de añadir un segundo componente | PLAN.md Fase 5, `exportar.py`, `ui/app.py` |
