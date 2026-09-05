@@ -13,7 +13,7 @@ import io
 
 import gradio as gr
 
-from .. import coleccion, config, imagenes, modelo
+from .. import coleccion, config, exportar, imagenes, modelo
 from ..ai.base import LecturaMoneda, es_lectura_fallida
 from ..ai.claude import ClaudeCoinReader
 from ..coleccion import TipoDuplicadoError
@@ -30,13 +30,31 @@ _AVISO_SIN_IA = (
 # microscopio Jiusion UVC en escritorio), sin necesidad de UI propia (RF-8).
 _OPCIONES_CAMARA = gr.WebcamOptions(mirror=False, constraints={"facingMode": "environment"})
 
+# Móvil (§10): tacto más cómodo en pantallas estrechas — botones/inputs algo
+# más grandes (Gradio ya reordena las filas en columna en breakpoints móviles).
+_CSS = """
+@media (max-width: 640px) {
+    button { font-size: 1.05em; min-height: 2.6em; }
+    input, textarea { font-size: 1.05em; }
+}
+"""
+
 _ESTADOS_ETIQUETAS = [
     ("En colección", modelo.EN_COLECCION),
     ("Duplicada", modelo.DUPLICADA),
     ("Para intercambio", modelo.PARA_INTERCAMBIO),
 ]
 
+_ESTADO_SLUG_A_ETIQUETA = {slug: etiqueta for etiqueta, slug in _ESTADOS_ETIQUETAS}
+_ESTADO_ETIQUETA_A_SLUG = {etiqueta: slug for etiqueta, slug in _ESTADOS_ETIQUETAS}
+_FILTRO_ESTADO_TODOS = "(todos)"
+
 _ENCABEZADOS_TABLA = ["id", "País", "Valor", "Año", "Ceca", "Variante", "Estado"]
+
+
+def _etiqueta_estado(estado: str) -> str:
+    return _ESTADO_SLUG_A_ETIQUETA.get(estado, estado)
+
 
 _ETIQUETA_PAIS = "País *"
 _ETIQUETA_VALOR = "Valor *"
@@ -96,7 +114,7 @@ def _fila_tabla(m: Moneda) -> list:
         m.anio if m.anio is not None else "",
         m.ceca or "",
         m.variante or "",
-        m.estado,
+        _etiqueta_estado(m.estado),
     ]
 
 
@@ -123,7 +141,7 @@ def _datos_ficha(m: Moneda) -> tuple[str, str | None, str | None, str | None, st
         f"- **Año:** {m.anio if m.anio is not None else 'desconocido'}\n"
         f"- **Ceca:** {m.ceca or '—'}\n"
         f"- **Variante:** {m.variante or '—'}\n"
-        f"- **Estado:** {dict((v, k) for k, v in _ESTADOS_ETIQUETAS).get(m.estado, m.estado)}\n"
+        f"- **Estado:** {_etiqueta_estado(m.estado)}\n"
         f"- **Notas:** {m.notas or '—'}\n"
         f"- **Añadida el:** {m.fecha_agregada}\n"
     )
@@ -289,10 +307,17 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                         # inicial y ese 0 se envía de verdad al backend (rompe "Buscar"
                         # sin tocar el año). Se parsea el año a mano abajo.
                         filtro_anio = gr.Textbox(label="Año", placeholder="p. ej. 2002")
+                        filtro_estado = gr.Dropdown(
+                            label="Estado",
+                            choices=[_FILTRO_ESTADO_TODOS, *_ESTADO_ETIQUETA_A_SLUG],
+                            value=_FILTRO_ESTADO_TODOS,
+                        )
                     with gr.Row():
-                        boton_buscar = gr.Button("🔍 Buscar")
+                        boton_buscar = gr.Button("🔍 Buscar", size="lg")
                         boton_limpiar = gr.Button("Limpiar filtros")
-                        boton_nueva = gr.Button("➕ Añadir moneda", variant="primary")
+                        boton_nueva = gr.Button("➕ Añadir moneda", variant="primary", size="lg")
+                        boton_exportar_csv = gr.DownloadButton("⬇️ Exportar CSV")
+                        boton_exportar_json = gr.DownloadButton("⬇️ Exportar JSON")
                     tabla = gr.Dataframe(
                         headers=_ENCABEZADOS_TABLA,
                         datatype=["number", "str", "str", "number", "str", "str", "str"],
@@ -333,7 +358,7 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                     )
                     aviso_captura = gr.Markdown(visible=False)
                     with gr.Row():
-                        boton_leer_ia = gr.Button("🔎 Leer con IA", variant="primary")
+                        boton_leer_ia = gr.Button("🔎 Leer con IA", variant="primary", size="lg")
                         boton_manual_en_vez = gr.Button("Prefiero rellenarlo a mano")
                         boton_cancelar_captura = gr.Button("Cancelar")
 
@@ -368,9 +393,12 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                         )
                     aviso_formulario = gr.Markdown(visible=False)
                     with gr.Row():
-                        boton_guardar = gr.Button("💾 Guardar", variant="primary")
+                        boton_guardar = gr.Button("💾 Guardar", variant="primary", size="lg")
                         boton_comprobar_bd = gr.Button(
-                            "🔎 Buscar en mi colección", variant="primary", visible=False
+                            "🔎 Buscar en mi colección",
+                            variant="primary",
+                            visible=False,
+                            size="lg",
                         )
                         boton_cancelar_formulario = gr.Button("Cancelar")
 
@@ -420,7 +448,7 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                             boton_confirmar_borrado = gr.Button("Sí, borrar", variant="stop")
                             boton_cancelar_borrado = gr.Button("Cancelar")
 
-                def _buscar(texto, pais, valor, anio):
+                def _buscar(texto, pais, valor, anio, estado):
                     anio_texto = (anio or "").strip()
                     anio_filtro = int(anio_texto) if anio_texto.isdigit() else None
                     monedas = coleccion.listar(
@@ -428,6 +456,7 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                         pais=pais or None,
                         valor=valor or None,
                         anio=anio_filtro,
+                        estado=_ESTADO_ETIQUETA_A_SLUG.get(estado),
                     )
                     return _filas_tabla(monedas), gr.update(
                         choices=_opciones_selector(monedas), value=None
@@ -440,9 +469,22 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
                         "",
                         "",
                         "",
+                        _FILTRO_ESTADO_TODOS,
                         _filas_tabla(monedas),
                         gr.update(choices=_opciones_selector(monedas), value=None),
                     )
+
+                def _exportar_csv():
+                    # gr.DownloadButton necesita 2 clics: el primero genera el
+                    # archivo y lo convierte en enlace real; sin cambiar la
+                    # etiqueta, un solo clic no parece hacer nada. El segundo
+                    # clic (ya con el enlace listo) dispara la descarga.
+                    ruta = exportar.exportar_csv(coleccion.listar())
+                    return gr.update(value=str(ruta), label="✅ Pulsa para descargar el CSV")
+
+                def _exportar_json():
+                    ruta = exportar.exportar_json(coleccion.listar())
+                    return gr.update(value=str(ruta), label="✅ Pulsa para descargar el JSON")
 
                 def _abrir_formulario_nuevo():
                     return (
@@ -956,13 +998,23 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
 
                 boton_buscar.click(
                     _buscar,
-                    inputs=[filtro_texto, filtro_pais, filtro_valor, filtro_anio],
+                    inputs=[filtro_texto, filtro_pais, filtro_valor, filtro_anio, filtro_estado],
                     outputs=[tabla, selector],
                 )
                 boton_limpiar.click(
                     _limpiar_filtros,
-                    outputs=[filtro_texto, filtro_pais, filtro_valor, filtro_anio, tabla, selector],
+                    outputs=[
+                        filtro_texto,
+                        filtro_pais,
+                        filtro_valor,
+                        filtro_anio,
+                        filtro_estado,
+                        tabla,
+                        selector,
+                    ],
                 )
+                boton_exportar_csv.click(_exportar_csv, outputs=[boton_exportar_csv])
+                boton_exportar_json.click(_exportar_json, outputs=[boton_exportar_json])
                 boton_nueva.click(
                     _abrir_formulario_nuevo,
                     outputs=[
@@ -1277,4 +1329,4 @@ def construir() -> gr.Blocks:  # noqa: C901 - wiring de UI, no lógica de negoci
 def lanzar() -> None:
     """Arranca el servidor Gradio en la red local (escritorio + móvil por wifi)."""
     config.asegurar_directorios()
-    construir().launch(server_name="0.0.0.0", server_port=config.PUERTO)
+    construir().launch(server_name="0.0.0.0", server_port=config.PUERTO, css=_CSS)

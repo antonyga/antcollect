@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from antcollect import coleccion, config, db
+from antcollect import coleccion, config, db, modelo
 
 
 @pytest.fixture(autouse=True)
@@ -145,6 +145,16 @@ def test_listar_busca_tambien_en_notas():
 
     assert len(coleccion.listar(texto="abuela")) == 1
     assert len(coleccion.listar(texto="inexistente")) == 0
+
+
+def test_listar_filtra_por_estado():
+    _crear_2_euros_espana(ceca="M", estado=modelo.EN_COLECCION)
+    _crear_2_euros_espana(ceca="S", estado=modelo.DUPLICADA)
+
+    assert len(coleccion.listar()) == 2
+    assert len(coleccion.listar(estado=modelo.EN_COLECCION)) == 1
+    assert len(coleccion.listar(estado=modelo.DUPLICADA)) == 1
+    assert len(coleccion.listar(estado=modelo.PARA_INTERCAMBIO)) == 0
 
 
 def test_comprobar_tipo_exacta():

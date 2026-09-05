@@ -51,6 +51,7 @@ def listar(
     pais: str | None = None,
     valor: str | None = None,
     anio: int | None = None,
+    estado: str | None = None,
 ) -> list[Moneda]:
     """Lista la colección aplicando los filtros dados (RF-9), todos opcionales."""
     condiciones: list[str] = []
@@ -75,6 +76,10 @@ def listar(
     if anio is not None:
         condiciones.append("anio = ?")
         parametros.append(anio)
+
+    if estado:
+        condiciones.append("estado = ?")
+        parametros.append(estado)
 
     sql = "SELECT * FROM monedas"
     if condiciones:
