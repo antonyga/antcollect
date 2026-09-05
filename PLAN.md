@@ -9,7 +9,7 @@
 
 ---
 
-## Fase actual: **5 — Pulido**
+## Fase actual: ninguna — **v1 completa** (fases 0 a 5)
 
 ---
 
@@ -134,7 +134,7 @@ móvil reales.
 
 ---
 
-## Fase 5 — Pulido  ·  rama `feat/fase-5-pulido`
+## Fase 5 — Pulido  ·  rama `feat/fase-5-pulido`  ·  ✅ completada
 
 Cubre: RF-13, §10, retoques de RF-12 y textos.
 
@@ -195,3 +195,4 @@ de pantalla del listado y el formulario en un viewport móvil (390×844).
 | 2026-09-05 | Detalle/macro (RF-8): tercer campo de foto `foto_detalle`, opcional, en su propia columna; nunca se envía a `CoinReader.leer()` | PLAN.md Fase 4, `db.py`/`modelo.py`/`imagenes.py`/`coleccion.py`/`ui/app.py` |
 | 2026-09-05 | Selección de cámara (RF-8): sin selector propio — se apoya en el enumerado nativo de `gr.Image` (Gradio); `webcam_options` con `facingMode: environment` y `mirror=False` para todas las fotos capturables | PLAN.md Fase 4 |
 | 2026-09-05 | Exportación (RF-13): módulo `exportar.py` separado de `coleccion.py`, vuelca solo columnas "bonitas" (nunca `*_norm`) a un archivo temporal; `gr.DownloadButton` requiere 2 clics en Gradio 6.26, se resuelve cambiando la etiqueta tras el 1er clic en vez de añadir un segundo componente | PLAN.md Fase 5, `exportar.py`, `ui/app.py` |
+| 2026-09-05 | Fase 5 (PR #6) mergeada a `main` — v1 completa (fases 0 a 5) | este archivo |
