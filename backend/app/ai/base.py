@@ -1,6 +1,11 @@
 """Contrato de lectura por IA (RNF-6): el resto de la app depende solo de esto.
 
-Nadie fuera de ``ai/`` debe importar el SDK de Anthropic directamente. Cambiar
+Copia de src/antcollect/ai/base.py (v1) ampliada para el backend con
+``intentar_leer`` / ``LecturaNoDisponibleError``, que permiten encadenar
+varios proveedores (Claude principal, OpenAI y DeepSeek de respaldo). El
+contrato original (``leer`` nunca lanza) no cambia.
+
+Nadie fuera de ``ai/`` debe importar el SDK de ningún proveedor de IA directamente. Cambiar
 de proveedor de IA es escribir un nuevo adaptador que implemente ``CoinReader``.
 """
 
@@ -27,14 +32,41 @@ class LecturaMoneda:
     campos_dudosos: list[str] = field(default_factory=list)
 
 
+class LecturaNoDisponibleError(Exception):
+    """Fallo *técnico* de un proveedor de IA (sin red, timeout, error de la
+    API, rechazo, respuesta sin la herramienta o no parseable). Distinto de
+    una lectura válida en la que la IA no pudo leer ningún campo."""
+
+
 class CoinReader(ABC):
     """Lee los campos del tipo a partir de una o dos fotos de una moneda."""
+
+    #: Nombre corto del proveedor, para los logs.
+    nombre: str = "desconocido"
 
     @abstractmethod
     def leer(self, imagen_anverso: bytes, imagen_reverso: bytes | None = None) -> LecturaMoneda:
         """Nunca lanza excepción al llamador: un fallo se refleja como una
         ``LecturaMoneda`` con todos los campos ``None`` y todos dudosos."""
         raise NotImplementedError
+
+    def intentar_leer(
+        self, imagen_anverso: bytes, imagen_reverso: bytes | None = None
+    ) -> LecturaMoneda:
+        """Como :meth:`leer`, pero un fallo técnico lanza
+        :class:`LecturaNoDisponibleError` en vez de devolver la lectura vacía.
+        Es lo que usa la cadena de respaldo (``ai/respaldo.py``) para saber
+        cuándo pasar al siguiente proveedor.
+
+        Implementación por defecto para adaptadores que solo definen
+        ``leer``: no puede distinguir un fallo técnico de "no se leyó nada",
+        así que trata la lectura vacía como fallo. Los adaptadores reales la
+        sobrescriben.
+        """
+        lectura = self.leer(imagen_anverso, imagen_reverso)
+        if es_lectura_fallida(lectura):
+            raise LecturaNoDisponibleError(f"{self.nombre}: lectura vacía")
+        return lectura
 
 
 def es_lectura_fallida(lectura: LecturaMoneda) -> bool:

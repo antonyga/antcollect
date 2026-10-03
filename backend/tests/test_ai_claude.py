@@ -265,3 +265,27 @@ def test_leer_con_imagen_invalida_no_propaga_excepcion(monkeypatch):
     lectura = lector.leer(b"no es una imagen")
 
     assert set(lectura.campos_dudosos) == set(CAMPOS_TIPO)
+
+
+def test_intentar_leer_lanza_ante_fallo_tecnico_para_activar_el_respaldo(monkeypatch):
+    from app.ai.base import LecturaNoDisponibleError
+
+    peticion = httpx2.Request("POST", "https://api.anthropic.com/v1/messages")
+    lector = _lector(monkeypatch, excepcion=anthropic.APIConnectionError(request=peticion))
+
+    with pytest.raises(LecturaNoDisponibleError):
+        lector.intentar_leer(_imagen_bytes())
+
+
+def test_cliente_sin_reintentos_para_que_el_respaldo_entre_al_momento(monkeypatch):
+    opciones = {}
+
+    def _fabrica(**kwargs):
+        opciones.update(kwargs)
+        return _ClienteFalso(respuesta=_RespuestaFalsa(content=[]))
+
+    monkeypatch.setattr(claude_mod.anthropic, "Anthropic", _fabrica)
+    claude_mod.ClaudeCoinReader(api_key="k", modelo="m").leer(_imagen_bytes())
+
+    assert opciones["max_retries"] == 0
+    assert opciones["timeout"] == claude_mod.config.ia_timeout_segundos

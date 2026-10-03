@@ -28,6 +28,12 @@ que se reutiliza desde aquí — ver el catálogo de reutilización).
   fallida no gasta cuota. Respuestas que la app debe tratar como "pasar a
   modo manual": `503` (IA no configurada), `429` (cuota agotada) y `200`
   con `fallida: true`.
+- **Respaldo de IA** (M2): Claude es el proveedor principal; si falla
+  (sin red, timeout, sobrecarga, error de la API, rechazo o respuesta
+  inválida), la misma petición prueba al momento OpenAI y después DeepSeek,
+  según qué claves haya en `.env`. Solo si fallan todos la app pasa al modo
+  manual. Una foto ilegible *no* es un fallo: no se pregunta a otro
+  proveedor.
 - **Exportación** (M2): `GET /exportar?formato=csv|json`, en streaming.
 
 ## Arrancar en local
@@ -47,7 +53,8 @@ Postgres a mano. En producción, `DATABASE_URL` debe ser una cadena
 Documentación interactiva de la API una vez arrancada: `http://localhost:8000/docs`
 (OpenAPI en `/openapi.json`).
 
-Sin `ANTHROPIC_API_KEY`, `POST /lecturas` responde `503` y todo lo demás
+Sin ninguna clave de IA (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
+`DEEPSEEK_API_KEY`), `POST /lecturas` responde `503` y todo lo demás
 funciona. Por defecto las fotos se guardan en `./almacen_dev/` (ignorado por
 git); en producción usar `ALMACEN=s3` (ver más abajo).
 
@@ -79,7 +86,12 @@ backend/
 │   ├── seguridad.py                # hash de contraseñas + JWT
 │   ├── auth.py                      # registro/login/refresco/borrar cuenta
 │   ├── dependencias.py               # sesión, usuario autenticado, almacén, lector IA
-│   ├── ai/                            # copia de src/antcollect/ai/ (CoinReader + Claude)
+│   ├── ai/                            # CoinReader (copia v1) + adaptadores:
+│   │   ├── comun.py                    #   prompt/esquema/parseo compartidos
+│   │   ├── claude.py                    #   principal (Anthropic)
+│   │   ├── gpt.py                        #   respaldo 1 (OpenAI, Responses API)
+│   │   ├── deepseek.py                    #   respaldo 2 (DeepSeek, compatible OpenAI)
+│   │   └── respaldo.py                     #   cadena: Claude → OpenAI → DeepSeek
 │   ├── almacen.py                      # Almacen: local (dev/tests) o S3 (producción)
 │   ├── imagenes.py                      # redimensionar (copia v1) + normalizar a JPEG
 │   ├── lecturas.py                       # cuota diaria de lecturas IA
@@ -99,6 +111,8 @@ backend/
     ├── test_lecturas.py                       # lectura IA + cuota diaria
     ├── test_exportar.py                        # CSV/JSON
     ├── test_ai_claude.py                        # adaptador Claude (migrado de la v1)
+    ├── test_ai_proveedores_respaldo.py           # adaptadores OpenAI y DeepSeek
+    ├── test_ai_respaldo.py                        # cadena de respaldo y su montaje
     └── test_almacen.py                           # contrato del almacén: local y S3 (moto)
 ```
 
@@ -120,6 +134,14 @@ backend/
   `claude-opus-5-5`) rechazan el forzado con un 400, y así cambiar
   `ANTCOLLECT_MODELO` no rompe la lectura. Modelo por defecto:
   `claude-sonnet-5` (misma decisión que la v1).
+- **Respaldo OpenAI → DeepSeek** (decisión del usuario): mismo prompt y
+  mismo esquema para los tres (`ai/comun.py`), porque el usuario no sabe
+  qué proveedor respondió. Timeout de 45 s y sin reintentos del SDK por
+  proveedor, para que el respaldo entre al momento. OpenAI usa la Responses
+  API (los modelos GPT-6 la exigen para tool calling); DeepSeek usa su API
+  compatible con OpenAI con el SDK `openai`. Ambos SDK solo se importan
+  dentro de `ai/` (RNF-6). La cuota cuenta una lectura por petición, la
+  sirva quien la sirva.
 
 ## Infraestructura (Railway)
 
@@ -135,6 +157,9 @@ Variables del servicio backend en producción:
 - `JWT_SECRET` → un secreto largo y aleatorio.
 - `ANTHROPIC_API_KEY`, y opcionalmente `ANTCOLLECT_MODELO` y
   `LECTURAS_IA_CUOTA_DIARIA`.
+- Respaldo (opcional): `OPENAI_API_KEY` + `ANTCOLLECT_MODELO_OPENAI`,
+  `DEEPSEEK_API_KEY` + `ANTCOLLECT_MODELO_DEEPSEEK`. Cada cuenta necesita
+  saldo y acceso al modelo elegido.
 - `ALMACEN=s3` + `S3_BUCKET`, `S3_ENDPOINT_URL`, `S3_REGION`,
   `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` → las credenciales del bucket
   de Railway (referenciándolas desde el servicio bucket, no copiándolas).

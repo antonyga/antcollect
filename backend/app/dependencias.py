@@ -14,6 +14,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from . import auth
 from .ai.base import CoinReader
 from .ai.claude import ClaudeCoinReader
+from .ai.deepseek import DeepSeekCoinReader
+from .ai.gpt import OpenAICoinReader
+from .ai.respaldo import CoinReaderConRespaldo
 from .almacen import Almacen, obtener_almacen
 from .config import config
 from .db import obtener_sesion
@@ -51,11 +54,20 @@ AlmacenDep = Annotated[Almacen, Depends(obtener_almacen)]
 
 
 def obtener_lector() -> CoinReader | None:
-    """El lector IA configurado, o ``None`` si el backend no tiene clave de
-    Anthropic (la lectura no está disponible y el cliente usa el modo manual)."""
-    if not config.anthropic_api_key:
+    """El lector IA configurado: Claude como principal y, si están sus claves,
+    OpenAI y DeepSeek como respaldo inmediato (en ese orden). ``None`` si no
+    hay ninguna clave (la lectura no está disponible y el cliente usa el modo
+    manual)."""
+    lectores: list[CoinReader] = []
+    if config.anthropic_api_key:
+        lectores.append(ClaudeCoinReader())
+    if config.openai_api_key:
+        lectores.append(OpenAICoinReader())
+    if config.deepseek_api_key:
+        lectores.append(DeepSeekCoinReader())
+    if not lectores:
         return None
-    return ClaudeCoinReader()
+    return CoinReaderConRespaldo(lectores)
 
 
 LectorDep = Annotated[CoinReader | None, Depends(obtener_lector)]

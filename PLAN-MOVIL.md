@@ -59,10 +59,11 @@ Cubre: RF-7/RF-8 (subida de imágenes), RF-M3, RNF-M2, RF-13.
 - [x] **Añadido**: las fotos se enderezan según EXIF (fotos de móvil) y se re-codifican a JPEG **sin metadatos** — no se guarda la geolocalización GPS que muchos móviles incrustan (privacidad, RNF-M3)
 - [x] **Añadido**: borrar una moneda borra sus fotos; borrar la cuenta borra todo su prefijo en el almacén (antes solo se borraban las filas). Fotos primero, para no dejar nunca fotos personales huérfanas
 - [x] Endpoint de lectura IA `POST /lecturas` reutilizando `ai/base.py` tal cual y `ai/claude.py` con cambios mínimos (config, EXIF, `tool_choice: auto` + `strict` porque los modelos actuales rechazan el forzado — ver `backend/README.md`). Solo propone: no escribe en la colección
+- [x] **Añadido a petición del usuario**: respaldo de IA. Claude es el principal; si falla técnicamente, la misma petición prueba al momento OpenAI (`gpt.py`, Responses API) y después DeepSeek (`deepseek.py`), sin mostrar error al usuario (`ai/respaldo.py`). Prompt/esquema compartidos en `ai/comun.py`. Verificado en vivo que la cadena salta de proveedor; las cuentas de OpenAI y DeepSeek del usuario aún no tienen saldo, así que esos dos adaptadores solo están verificados con tests contra el formato documentado
 - [x] Cuota diaria configurable por usuario (`LECTURAS_IA_CUOTA_DIARIA`, tabla `lecturas_ia`, migración `ef7bec6a4a6f`), `GET /lecturas/cuota`; lectura fallida no gasta cuota; `429`/`503`/`fallida: true` → la app pasa a modo manual
 - [x] Endpoints de exportación CSV/JSON en streaming: `GET /exportar?formato=csv|json` (adaptado de `exportar.py`)
 - [x] Documentación OpenAPI servida (`/docs`, `/openapi.json`) y revisada: todas las rutas aparecen con sus tipos de contenido
-- [x] Tests: 93 en total (61 nuevos) — imágenes (normalización, aislamiento entre usuarios, limpieza), lecturas + cuota (por usuario, renovación diaria, sin gastar en fallos), exportación, adaptador Claude (migrados de la v1), contrato del almacén contra local y S3 simulado (`moto`)
+- [x] Tests: 115 en total (83 nuevos respecto a M1) — imágenes (normalización, aislamiento entre usuarios, limpieza), lecturas + cuota (por usuario, renovación diaria, sin gastar en fallos), exportación, adaptador Claude (migrados de la v1), adaptadores OpenAI/DeepSeek y cadena de respaldo, contrato del almacén contra local y S3 simulado (`moto`)
 
 **Sale usable:** backend completo — todo lo que necesita la app móvil ya tiene API. Verificado con `pytest` + smoke test manual contra `uvicorn` (registro → moneda → foto → descarga → lectura sin clave = 503 → exportar → borrar moneda y cuenta = almacén vacío).
 
@@ -141,3 +142,4 @@ Cubre: RF-M1 (borrado de cuenta visible), RNF-M3.
 | 2026-10-03 | Cuota IA con "reservar y devolver", día natural UTC; la lectura fallida no gasta | `backend/app/lecturas.py` |
 | 2026-10-03 | Adaptador Claude del backend: `tool_choice: auto` + `strict: true` (el forzado da 400 en modelos actuales); modelo por defecto sigue `claude-sonnet-5` | `backend/app/ai/claude.py` |
 | 2026-10-03 | Fotos re-codificadas a JPEG sin EXIF (sin geolocalización) | `backend/app/imagenes.py` |
+| 2026-10-03 | IA con respaldo: Claude principal → OpenAI → DeepSeek, al momento y en la misma petición; solo cuentan los fallos técnicos (una foto ilegible no salta de proveedor) | `backend/app/ai/respaldo.py`, `backend/README.md` |
