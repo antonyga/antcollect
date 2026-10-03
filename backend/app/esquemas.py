@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 
 class UsuarioRegistro(BaseModel):
@@ -64,7 +64,17 @@ class MonedaEdicion(BaseModel):
     estado: str | None = None
 
 
+def url_imagen(moneda_id: int, cara: str) -> str:
+    """Ruta (relativa a la API) desde la que el cliente descarga una foto."""
+    return f"/coleccion/{moneda_id}/imagenes/{cara}"
+
+
 class MonedaSalida(BaseModel):
+    """En BD, ``foto_*`` guarda la clave interna del objeto en el almacén; al
+    cliente se le da en su lugar la ruta autenticada de descarga (o ``None``
+    si no hay foto), para no acoplar la app a cómo se guardan las imágenes.
+    """
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -80,6 +90,14 @@ class MonedaSalida(BaseModel):
     foto_detalle: str | None
     fecha_agregada: datetime
 
+    @model_validator(mode="after")
+    def _claves_a_urls(self) -> MonedaSalida:
+        for cara in ("anverso", "reverso", "detalle"):
+            campo = f"foto_{cara}"
+            if getattr(self, campo):
+                setattr(self, campo, url_imagen(self.id, cara))
+        return self
+
 
 class ComprobarTipoEntrada(BaseModel):
     pais: str | None = None
@@ -94,3 +112,29 @@ class ComprobarTipoSalida(BaseModel):
     categoria: str
     exacta: MonedaSalida | None
     posibles: list[MonedaSalida]
+
+
+class LecturaSalida(BaseModel):
+    """Campos *propuestos* por la IA (principio rector: la máquina propone, el
+    humano dispone). Nunca se guardan solos: el cliente los muestra en un
+    formulario editable, resaltando ``campos_dudosos``, y solo tras la
+    confirmación humana llama a ``POST /coleccion`` o ``/coleccion/comprobar``.
+
+    ``fallida`` = la IA no pudo leer nada (red, API, respuesta inválida): el
+    cliente pasa al modo manual (RF-6). Una lectura fallida no gasta cuota.
+    """
+
+    pais: str | None
+    valor_texto: str | None
+    anio: int | None
+    ceca: str | None
+    variante: str | None
+    campos_dudosos: list[str]
+    fallida: bool
+    lecturas_restantes_hoy: int
+
+
+class CuotaSalida(BaseModel):
+    limite_diario: int
+    usadas_hoy: int
+    restantes_hoy: int

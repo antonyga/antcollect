@@ -91,8 +91,8 @@ async def refrescar(sesion: AsyncSession, refresh_token: str) -> ParDeTokens:
 async def borrar_cuenta(sesion: AsyncSession, usuario_id: int) -> None:
     """Borra la cuenta y, en cascada, toda su colección (RF-M1 — obligatorio
     para la revisión de Apple si la app permite crear cuentas, ver Docs
-    .../Movil-Arquitectura-y-Requisitos.md §7). El borrado de las imágenes en
-    object storage se añade en la Fase M2.
+    .../Movil-Arquitectura-y-Requisitos.md §7). Las fotos en el almacén las
+    borra antes la ruta (``rutas/auth.py``), que es quien tiene acceso a él.
     """
     usuario = await obtener_usuario_por_id(sesion, usuario_id)
     if usuario is None:

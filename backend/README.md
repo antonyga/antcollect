@@ -12,10 +12,23 @@ que se reutiliza desde aquí — ver el catálogo de reutilización).
 
 ## Estado
 
-**Fase M1 completa:** autenticación (registro/login/refresco/borrado de
-cuenta) y colección multiusuario (alta, edición, borrado, listado, "¿la
-tengo?", detección de duplicados) scopeada por `usuario_id`. Sin imágenes ni
-lectura por IA todavía — eso es la Fase M2.
+**Fases M1 + M2 completas** — el backend ya cubre todo lo que necesita la app:
+
+- **Auth** (M1): registro, login, refresco de JWT, `GET /auth/yo`, borrado
+  de cuenta (borra también todas sus fotos).
+- **Colección** (M1): alta, edición, borrado, listado con filtros, "¿la
+  tengo?" (`POST /coleccion/comprobar`), duplicados — scopeado por usuario.
+- **Fotos** (M2): `PUT/GET/DELETE /coleccion/{id}/imagenes/{anverso|reverso|detalle}`.
+  Se enderezan (EXIF), se reducen a 2000 px y se guardan como JPEG **sin
+  metadatos** (no se guarda la geolocalización de la foto). Se sirven a
+  través de la API con el JWT, nunca con URLs públicas del bucket.
+- **Lectura IA** (M2): `POST /lecturas` (multipart `anverso` + `reverso`
+  opcional) devuelve campos **propuestos** — no escribe nada en la
+  colección. Cuota diaria por usuario (`GET /lecturas/cuota`); una lectura
+  fallida no gasta cuota. Respuestas que la app debe tratar como "pasar a
+  modo manual": `503` (IA no configurada), `429` (cuota agotada) y `200`
+  con `fallida: true`.
+- **Exportación** (M2): `GET /exportar?formato=csv|json`, en streaming.
 
 ## Arrancar en local
 
@@ -31,7 +44,12 @@ Por defecto, sin `DATABASE_URL` en `.env`, apunta a un SQLite local
 Postgres a mano. En producción, `DATABASE_URL` debe ser una cadena
 `postgresql+asyncpg://...` (Railway la da al aprovisionar la BD).
 
-Documentación interactiva de la API una vez arrancada: `http://localhost:8000/docs`.
+Documentación interactiva de la API una vez arrancada: `http://localhost:8000/docs`
+(OpenAPI en `/openapi.json`).
+
+Sin `ANTHROPIC_API_KEY`, `POST /lecturas` responde `503` y todo lo demás
+funciona. Por defecto las fotos se guardan en `./almacen_dev/` (ignorado por
+git); en producción usar `ALMACEN=s3` (ver más abajo).
 
 ## Tests
 
@@ -42,7 +60,9 @@ uv run ruff format --check .
 ```
 
 Los tests corren contra SQLite en memoria (`aiosqlite`), sin necesitar
-Postgres ni Railway — ver `tests/conftest.py`.
+Postgres ni Railway — ver `tests/conftest.py`. Tampoco llaman nunca a la API
+de Anthropic (lector IA falso) ni a un bucket real (almacén en `tmp_path`, y
+el adaptador S3 se prueba contra un S3 simulado con `moto`).
 
 ## Estructura
 
@@ -58,21 +78,64 @@ backend/
 │   ├── coleccion.py              # adaptado de src/antcollect/coleccion.py (usuario_id, async)
 │   ├── seguridad.py                # hash de contraseñas + JWT
 │   ├── auth.py                      # registro/login/refresco/borrar cuenta
-│   ├── dependencias.py               # sesión de BD + usuario autenticado (FastAPI Depends)
-│   ├── ai/                            # (Fase M2) copia de src/antcollect/ai/
+│   ├── dependencias.py               # sesión, usuario autenticado, almacén, lector IA
+│   ├── ai/                            # copia de src/antcollect/ai/ (CoinReader + Claude)
+│   ├── almacen.py                      # Almacen: local (dev/tests) o S3 (producción)
+│   ├── imagenes.py                      # redimensionar (copia v1) + normalizar a JPEG
+│   ├── lecturas.py                       # cuota diaria de lecturas IA
+│   ├── exportar.py                        # CSV/JSON por trozos (adaptado de la v1)
 │   └── rutas/
 │       ├── auth.py                     # /auth/*
-│       └── coleccion.py                 # /coleccion/*
+│       ├── coleccion.py                 # /coleccion/*
+│       ├── imagenes.py                   # /coleccion/{id}/imagenes/{cara}
+│       ├── lecturas.py                    # /lecturas, /lecturas/cuota
+│       └── exportar.py                     # /exportar
 ├── alembic/                              # migraciones (fuente de verdad del esquema)
 └── tests/
     ├── conftest.py                        # BD de pruebas en memoria + cliente HTTP
     ├── test_coleccion.py                   # migrado de tests/test_coleccion.py (v1)
-    └── test_auth.py                         # auth + aislamiento entre usuarios (RNF-M1)
+    ├── test_auth.py                         # auth + aislamiento entre usuarios (RNF-M1)
+    ├── test_imagenes.py                      # fotos: normalización, aislamiento, limpieza
+    ├── test_lecturas.py                       # lectura IA + cuota diaria
+    ├── test_exportar.py                        # CSV/JSON
+    ├── test_ai_claude.py                        # adaptador Claude (migrado de la v1)
+    └── test_almacen.py                           # contrato del almacén: local y S3 (moto)
 ```
+
+## Decisiones de la Fase M2
+
+- **Fotos a través del backend, no URLs públicas/firmadas del bucket.** El
+  aislamiento entre usuarios lo garantiza la misma comprobación de
+  propiedad que el resto de la API, y el bucket puede ser privado. Coste:
+  el tráfico de imágenes pasa por el servicio (aceptable a esta escala;
+  revisable con URLs prefirmadas si hiciera falta).
+- **La lectura IA no guarda las fotos.** Se leen y se descartan; si el
+  usuario guarda la moneda, la app sube después las fotos a
+  `/coleccion/{id}/imagenes/...`. Así `POST /lecturas` no escribe nada.
+- **Cuota con "reservar y devolver".** Se cuenta la lectura antes de llamar
+  a la IA (nunca se supera la cuota aunque lleguen peticiones a la vez) y se
+  devuelve si la IA no pudo leer nada. Día natural en UTC.
+- **`tool_choice: auto` + `strict: true`** en el adaptador Claude, en vez del
+  `tool_choice` forzado de la v1: los modelos actuales (`claude-sonnet-5-5`,
+  `claude-opus-5-5`) rechazan el forzado con un 400, y así cambiar
+  `ANTCOLLECT_MODELO` no rompe la lectura. Modelo por defecto:
+  `claude-sonnet-5` (misma decisión que la v1).
 
 ## Infraestructura (Railway)
 
-PostgreSQL + object storage + servicio backend, aprovisionados en Railway
-(pendiente — bloqueado en la Fase M0 por fallo de conexión del MCP de Railway
-en esa sesión; reintentar antes de desplegar de verdad. El código ya funciona
-en local contra SQLite mientras tanto).
+PostgreSQL + bucket de object storage + servicio backend, aprovisionados en
+Railway (pendiente — el MCP de Railway no conectó en las sesiones de M0–M2;
+reintentar antes de desplegar de verdad. El código ya funciona en local
+contra SQLite y almacén en disco mientras tanto).
+
+Variables del servicio backend en producción:
+
+- `DATABASE_URL` → la del Postgres de Railway, con el esquema
+  `postgresql+asyncpg://`.
+- `JWT_SECRET` → un secreto largo y aleatorio.
+- `ANTHROPIC_API_KEY`, y opcionalmente `ANTCOLLECT_MODELO` y
+  `LECTURAS_IA_CUOTA_DIARIA`.
+- `ALMACEN=s3` + `S3_BUCKET`, `S3_ENDPOINT_URL`, `S3_REGION`,
+  `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` → las credenciales del bucket
+  de Railway (referenciándolas desde el servicio bucket, no copiándolas).
+- Antes de arrancar: `alembic upgrade head`.

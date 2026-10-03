@@ -10,6 +10,8 @@ antcollect.db
 /imagenes/
 /data/
 /backups/
+# Almacén de imágenes local del backend en desarrollo (fotos de usuarios)
+/backend/almacen_dev/
 antcollect.log
 *.log
 
