@@ -1,4 +1,4 @@
-"""Modelos ORM (SQLAlchemy 2.0): Usuario y Moneda.
+"""Modelos ORM (SQLAlchemy 2.0): Usuario, Moneda y LecturaIA.
 
 Adaptado de src/antcollect/modelo.py (v1): la dataclass ``Moneda`` pasa a ser
 una tabla ORM con ``usuario_id`` (ownership) en vez de depender de
@@ -35,6 +35,7 @@ class Usuario(Base):
     monedas: Mapped[list[Moneda]] = relationship(
         back_populates="usuario", cascade="all, delete-orphan"
     )
+    lecturas_ia: Mapped[list[LecturaIA]] = relationship(cascade="all, delete-orphan")
 
 
 class Moneda(Base):
@@ -86,3 +87,21 @@ class Moneda(Base):
     variante_norm: Mapped[str] = mapped_column(String(200), default="")
 
     usuario: Mapped[Usuario] = relationship(back_populates="monedas")
+
+
+class LecturaIA(Base):
+    """Registro de una lectura por IA consumida por un usuario, para la cuota
+    diaria (RF-M3, RNF-M2). Solo guarda cuándo y de quién: ni las fotos ni el
+    resultado (la lectura es una propuesta efímera hasta que el humano la
+    confirma y la guarda como `Moneda`).
+    """
+
+    __tablename__ = "lecturas_ia"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    usuario_id: Mapped[int] = mapped_column(
+        ForeignKey("usuarios.id", ondelete="CASCADE"), index=True
+    )
+    creada_en: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), index=True
+    )

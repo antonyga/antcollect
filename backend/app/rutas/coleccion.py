@@ -6,9 +6,10 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, status
+from fastapi.concurrency import run_in_threadpool
 
 from .. import coleccion
-from ..dependencias import SesionDep, UsuarioActualDep
+from ..dependencias import AlmacenDep, SesionDep, UsuarioActualDep
 from ..esquemas import (
     ComprobarTipoEntrada,
     ComprobarTipoSalida,
@@ -86,7 +87,18 @@ async def editar(
 
 
 @router.delete("/{moneda_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def borrar(moneda_id: int, usuario_actual: UsuarioActualDep, sesion: SesionDep) -> None:
+async def borrar(
+    moneda_id: int, usuario_actual: UsuarioActualDep, sesion: SesionDep, almacen: AlmacenDep
+) -> None:
+    """Borra la moneda y sus fotos (RF-11). Primero las fotos: si el almacén
+    falla, la moneda sigue intacta y el cliente puede reintentar; al revés
+    quedarían fotos huérfanas sin forma de borrarlas desde la app."""
+    moneda = await coleccion.obtener(sesion, usuario_actual.id, moneda_id)
+    if moneda is None:
+        return
+    for clave in (moneda.foto_anverso, moneda.foto_reverso, moneda.foto_detalle):
+        if clave:
+            await run_in_threadpool(almacen.borrar, clave)
     await coleccion.borrar(sesion, usuario_actual.id, moneda_id)
 
 

@@ -305,8 +305,8 @@ async def editar(
 async def borrar(sesion: AsyncSession, usuario_id: int, moneda_id: int) -> None:
     """Borra una moneda del usuario (RF-11). Confirmación es cosa del cliente.
 
-    El borrado de las imágenes en object storage se añade en la Fase M2
-    (aquí solo se borra la fila; `foto_*` hoy solo guarda rutas/claves).
+    Solo borra la fila: las fotos en el almacén las borra antes la ruta
+    (``rutas/coleccion.py``), que es quien tiene acceso al almacén.
     """
     moneda = await obtener(sesion, usuario_id, moneda_id)
     if moneda is None:

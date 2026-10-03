@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, status
+from fastapi.concurrency import run_in_threadpool
 
 from .. import auth
-from ..dependencias import SesionDep, UsuarioActualDep
+from ..almacen import prefijo_usuario
+from ..dependencias import AlmacenDep, SesionDep, UsuarioActualDep
 from ..esquemas import ParDeTokens, RefrescoEntrada, UsuarioLogin, UsuarioRegistro, UsuarioSalida
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -45,6 +47,12 @@ async def yo(usuario_actual: UsuarioActualDep) -> UsuarioSalida:
 
 
 @router.delete("/cuenta", status_code=status.HTTP_204_NO_CONTENT)
-async def borrar_cuenta(usuario_actual: UsuarioActualDep, sesion: SesionDep) -> None:
-    """Borra la cuenta del usuario autenticado y toda su colección (RF-M1)."""
+async def borrar_cuenta(
+    usuario_actual: UsuarioActualDep, sesion: SesionDep, almacen: AlmacenDep
+) -> None:
+    """Borra la cuenta del usuario autenticado, toda su colección y todas sus
+    fotos (RF-M1). Las fotos primero, por el mismo motivo que al borrar una
+    moneda: si el almacén falla, la cuenta sigue existiendo y se puede
+    reintentar, en vez de quedar fotos personales huérfanas en el bucket."""
+    await run_in_threadpool(almacen.borrar_prefijo, prefijo_usuario(usuario_actual.id))
     await auth.borrar_cuenta(sesion, usuario_actual.id)

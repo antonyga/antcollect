@@ -11,7 +11,9 @@
 
 ---
 
-## Fase actual: **M1 — Backend: autenticación + dominio multiusuario** (completa, pendiente de PR)
+## Fase actual: **M2 — Backend: imágenes + IA + exportación** (completa, pendiente de PR)
+
+> M1 está en PR #10 (recuperación: su primer PR, #9, se mergeó en la rama de M0 y no llegó a `main`). La rama de M2 sale de la de M1; su PR apunta a `main` directamente para no repetir ese problema.
 
 ---
 
@@ -29,7 +31,7 @@
 
 ---
 
-## Fase M1 — Backend: autenticación + dominio multiusuario  ·  rama `feat/fase-m1-backend-auth`  ·  ✅ completada (código), pendiente de PR
+## Fase M1 — Backend: autenticación + dominio multiusuario  ·  rama `feat/fase-m1-backend-auth` (recuperada en `fix/recupera-fase-m1`)  ·  ✅ completada, PR #10 pendiente de merge
 
 Cubre: RF-M1, RNF-M1.
 
@@ -49,16 +51,23 @@ Cubre: RF-M1, RNF-M1.
 
 ---
 
-## Fase M2 — Backend: imágenes + IA + exportación  ·  rama `feat/fase-m2-backend-ia`
+## Fase M2 — Backend: imágenes + IA + exportación  ·  rama `feat/fase-m2-backend-ia`  ·  ✅ completada (código), pendiente de PR
 
 Cubre: RF-7/RF-8 (subida de imágenes), RF-M3, RNF-M2, RF-13.
 
-- [ ] Subida/descarga de imágenes a object storage (anverso/reverso/detalle), reutilizando `imagenes.redimensionar()` tal cual
-- [ ] Endpoint de lectura IA reutilizando `ai/base.py` + `ai/claude.py` tal cual, con cuota diaria configurable por usuario
-- [ ] Endpoints de exportación CSV/JSON en streaming (adaptado de `exportar.py`)
-- [ ] Documentación OpenAPI servida y revisada
+- [x] Subida/descarga/borrado de imágenes (anverso/reverso/detalle): `PUT/GET/DELETE /coleccion/{id}/imagenes/{cara}`, reutilizando `imagenes.redimensionar()` tal cual. Interfaz `Almacen` con dos implementaciones: `AlmacenLocal` (dev/tests) y `AlmacenS3` (producción, cualquier S3 compatible — Railway Buckets). Claves `usuarios/{usuario_id}/monedas/{id:04d}_{cara}.jpg`
+- [x] **Añadido**: las fotos se enderezan según EXIF (fotos de móvil) y se re-codifican a JPEG **sin metadatos** — no se guarda la geolocalización GPS que muchos móviles incrustan (privacidad, RNF-M3)
+- [x] **Añadido**: borrar una moneda borra sus fotos; borrar la cuenta borra todo su prefijo en el almacén (antes solo se borraban las filas). Fotos primero, para no dejar nunca fotos personales huérfanas
+- [x] Endpoint de lectura IA `POST /lecturas` reutilizando `ai/base.py` tal cual y `ai/claude.py` con cambios mínimos (config, EXIF, `tool_choice: auto` + `strict` porque los modelos actuales rechazan el forzado — ver `backend/README.md`). Solo propone: no escribe en la colección
+- [x] **Añadido a petición del usuario**: respaldo de IA. Claude es el principal; si falla técnicamente, la misma petición prueba al momento OpenAI (`gpt.py`, Responses API) y después DeepSeek (`deepseek.py`), sin mostrar error al usuario (`ai/respaldo.py`). Prompt/esquema compartidos en `ai/comun.py`. Verificado en vivo que la cadena salta de proveedor; las cuentas de OpenAI y DeepSeek del usuario aún no tienen saldo, así que esos dos adaptadores solo están verificados con tests contra el formato documentado
+- [x] Cuota diaria configurable por usuario (`LECTURAS_IA_CUOTA_DIARIA`, tabla `lecturas_ia`, migración `ef7bec6a4a6f`), `GET /lecturas/cuota`; lectura fallida no gasta cuota; `429`/`503`/`fallida: true` → la app pasa a modo manual
+- [x] Endpoints de exportación CSV/JSON en streaming: `GET /exportar?formato=csv|json` (adaptado de `exportar.py`)
+- [x] Documentación OpenAPI servida (`/docs`, `/openapi.json`) y revisada: todas las rutas aparecen con sus tipos de contenido
+- [x] Tests: 115 en total (83 nuevos respecto a M1) — imágenes (normalización, aislamiento entre usuarios, limpieza), lecturas + cuota (por usuario, renovación diaria, sin gastar en fallos), exportación, adaptador Claude (migrados de la v1), adaptadores OpenAI/DeepSeek y cadena de respaldo, contrato del almacén contra local y S3 simulado (`moto`)
 
-**Sale usable:** backend completo — todo lo que necesita la app móvil ya tiene API.
+**Sale usable:** backend completo — todo lo que necesita la app móvil ya tiene API. Verificado con `pytest` + smoke test manual contra `uvicorn` (registro → moneda → foto → descarga → lectura sin clave = 503 → exportar → borrar moneda y cuenta = almacén vacío).
+
+**Pendiente (fuera de esta fase):** probar una lectura real contra la API de Anthropic (requiere `ANTHROPIC_API_KEY` en `backend/.env`) y desplegar en Railway con Postgres + bucket (bloqueado desde M0).
 
 ---
 
@@ -129,3 +138,8 @@ Cubre: RF-M1 (borrado de cuenta visible), RNF-M3.
 | 2026-10-03 | Backend: ORM SQLAlchemy 2.0 (no SQLModel) + esquemas Pydantic separados en `app/esquemas.py` — evita acoplar la forma de la API al esquema de BD y evita exponer columnas internas (p. ej. `password_hash`) por error | `backend/app/modelos.py`, `backend/app/esquemas.py` |
 | 2026-10-03 | Auth: JWT access (30 min) + refresh (30 días) por defecto, configurable por entorno; contraseñas con `bcrypt` directo (no `passlib`, menos mantenido) | `backend/app/seguridad.py` |
 | 2026-10-03 | Tests de backend contra SQLite en memoria (`aiosqlite` + `StaticPool`), no contra Postgres real — no bloquea desarrollo mientras Railway no esté disponible; el esquema generado por Alembic es portable | `backend/tests/conftest.py` |
+| 2026-10-03 | Fotos servidas a través del backend con JWT (bucket privado), no URLs públicas/prefirmadas | `backend/app/rutas/imagenes.py`, `backend/README.md` |
+| 2026-10-03 | Cuota IA con "reservar y devolver", día natural UTC; la lectura fallida no gasta | `backend/app/lecturas.py` |
+| 2026-10-03 | Adaptador Claude del backend: `tool_choice: auto` + `strict: true` (el forzado da 400 en modelos actuales); modelo por defecto sigue `claude-sonnet-5` | `backend/app/ai/claude.py` |
+| 2026-10-03 | Fotos re-codificadas a JPEG sin EXIF (sin geolocalización) | `backend/app/imagenes.py` |
+| 2026-10-03 | IA con respaldo: Claude principal → OpenAI → DeepSeek, al momento y en la misma petición; solo cuentan los fallos técnicos (una foto ilegible no salta de proveedor) | `backend/app/ai/respaldo.py`, `backend/README.md` |
