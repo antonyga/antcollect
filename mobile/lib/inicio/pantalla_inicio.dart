@@ -1,0 +1,164 @@
+import 'package:flutter/material.dart';
+
+import '../api/modelos.dart';
+import '../auth/sesion.dart';
+import '../coleccion/pantalla_ficha.dart';
+import '../coleccion/pantalla_formulario.dart';
+import '../coleccion/pantalla_listado.dart';
+
+/// Pantalla de inicio: dos acciones grandes, como en la v1.
+class PantallaInicio extends StatelessWidget {
+  const PantallaInicio({super.key});
+
+  Future<void> _nuevaMoneda(BuildContext context) async {
+    final navegador = Navigator.of(context);
+    final guardada = await navegador.push<Moneda>(
+      MaterialPageRoute(builder: (_) => const PantallaFormulario()),
+    );
+    if (guardada != null) {
+      await navegador.push(
+        MaterialPageRoute<void>(builder: (_) => PantallaFicha(monedaId: guardada.id)),
+      );
+    }
+  }
+
+  Future<void> _confirmarCierre(BuildContext context) async {
+    final sesion = AmbitoSesion.leer(context);
+    final confirmado = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('¿Cerrar sesión?'),
+        content: const Text('Tu colección sigue guardada en tu cuenta.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Cerrar sesión'),
+          ),
+        ],
+      ),
+    );
+    if (confirmado == true) await sesion.cerrarSesion();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sesion = AmbitoSesion.de(context);
+    final tema = Theme.of(context);
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('AntCollect'),
+        actions: [
+          PopupMenuButton<void>(
+            key: const Key('inicio.menu'),
+            icon: const Icon(Icons.account_circle_outlined),
+            tooltip: 'Cuenta',
+            itemBuilder: (context) => [
+              PopupMenuItem(enabled: false, child: Text(sesion.usuario?.email ?? '')),
+              const PopupMenuDivider(),
+              PopupMenuItem(
+                key: const Key('inicio.cerrarSesion'),
+                onTap: () => _confirmarCierre(context),
+                child: const ListTile(
+                  leading: Icon(Icons.logout),
+                  title: Text('Cerrar sesión'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    '¿Qué quieres hacer?',
+                    style: tema.textTheme.headlineSmall,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 32),
+                  _BotonGrande(
+                    key: const Key('inicio.nueva'),
+                    icono: Icons.add_circle_outline,
+                    titulo: 'Enseñar moneda nueva',
+                    detalle: 'Añádela a tu colección escribiendo sus datos',
+                    onPressed: () => _nuevaMoneda(context),
+                  ),
+                  const SizedBox(height: 16),
+                  _BotonGrande(
+                    key: const Key('inicio.coleccion'),
+                    icono: Icons.collections_bookmark_outlined,
+                    titulo: 'Mi colección',
+                    detalle: 'Busca, revisa y edita tus monedas',
+                    onPressed: () =>
+                        Navigator.of(context)
+                            .push(MaterialPageRoute<void>(builder: (_) => const PantallaListado())),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BotonGrande extends StatelessWidget {
+  const _BotonGrande({
+    super.key,
+    required this.icono,
+    required this.titulo,
+    required this.detalle,
+    required this.onPressed,
+  });
+
+  final IconData icono;
+  final String titulo;
+  final String detalle;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final tema = Theme.of(context);
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onPressed,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Row(
+            children: [
+              Icon(icono, size: 40, color: tema.colorScheme.primary),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(titulo, style: tema.textTheme.titleMedium),
+                    const SizedBox(height: 4),
+                    Text(
+                      detalle,
+                      style: tema.textTheme.bodyMedium?.copyWith(
+                        color: tema.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
