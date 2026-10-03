@@ -22,6 +22,11 @@ class Config(BaseSettings):
     jwt_acceso_minutos: int = 30
     jwt_refresco_dias: int = 30
 
+    # Orígenes permitidos por CORS, separados por comas. Vacío (por defecto) =
+    # CORS desactivado: la app nativa no lo necesita. Solo hace falta para
+    # desarrollar la app Flutter en el navegador (`flutter run -d chrome`).
+    cors_origenes: str = ""
+
     # --- Lectura por IA (RF-1/RF-2, RF-M3) ---
     # La clave vive SOLO aquí, en el backend (RNF-5): nunca en la app móvil.
     anthropic_api_key: str = ""
