@@ -11,7 +11,7 @@
 
 ---
 
-## Fase actual: **M3 — App Flutter: esqueleto + auth + colección** (completa, pendiente de PR)
+## Fase actual: **M3 — App Flutter: esqueleto + auth + colección** (completa, PR #12 abierto)
 
 > M1 (PR #10) y M2 (PR #11) están mergeadas en `main`. La rama de M3 sale de `main` actualizado.
 
@@ -71,7 +71,7 @@ Cubre: RF-7/RF-8 (subida de imágenes), RF-M3, RNF-M2, RF-13.
 
 ---
 
-## Fase M3 — App Flutter: esqueleto + auth + colección  ·  rama `feat/fase-m3-flutter-base`  ·  ✅ completada, pendiente de PR
+## Fase M3 — App Flutter: esqueleto + auth + colección  ·  rama `feat/fase-m3-flutter-base`  ·  ✅ completada, PR #12 abierto
 
 Cubre: RF-M1 (cliente), RF-M2, RF-6 (alta manual), RF-9, RF-10, RF-11, RF-12, RF-14 (aviso en cliente).
 
