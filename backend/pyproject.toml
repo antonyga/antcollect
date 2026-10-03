@@ -1,0 +1,56 @@
+[project]
+name = "antcollect-backend"
+version = "0.1.0"
+description = "API de AntCollect Móvil: autenticación, colección multiusuario, lectura por IA y exportación para la app Flutter."
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "sqlalchemy[asyncio]>=2.0",
+    "asyncpg>=0.30",
+    "alembic>=1.13",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "email-validator>=2.2",
+    "python-dotenv>=1.0",
+    "pyjwt>=2.9",
+    "bcrypt>=4.2",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.6",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "httpx>=0.27",
+    "aiosqlite>=0.20",
+]
+
+[tool.uv]
+# El equipo usa un proxy TLS con CA propia; usar el almacén de certificados del
+# sistema en vez del bundle de uv (mismo motivo que la v1, ver pyproject.toml raíz).
+system-certs = true
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["app", "tests"]
+# Migraciones: código autogenerado por `alembic revision --autogenerate`,
+# no se edita a mano ni se le aplican nuestras convenciones de estilo.
+extend-exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
