@@ -11,9 +11,9 @@
 
 ---
 
-## Fase actual: **M2 — Backend: imágenes + IA + exportación** (completa, pendiente de PR)
+## Fase actual: **M3 — App Flutter: esqueleto + auth + colección** (completa, PR #12 abierto)
 
-> M1 está en PR #10 (recuperación: su primer PR, #9, se mergeó en la rama de M0 y no llegó a `main`). La rama de M2 sale de la de M1; su PR apunta a `main` directamente para no repetir ese problema.
+> M1 (PR #10) y M2 (PR #11) están mergeadas en `main`. La rama de M3 sale de `main` actualizado.
 
 ---
 
@@ -25,13 +25,13 @@
 - [x] Estructura de carpetas `backend/` (FastAPI) y `mobile/` (Flutter) como esqueletos vacíos/mínimos
 - [ ] Infraestructura en Railway: PostgreSQL + bucket de object storage + servicio backend (skill `use-railway`) — **bloqueado**: el MCP de Railway no conectó en esta sesión (`CONNECTION_CLOSED`). Reintentar al empezar la Fase M1.
 - [ ] Aviso al usuario de las cuentas que debe crear él mismo: Apple Developer Program (~99 $/año) y Google Play Console (25 $ una vez) — no delegable
-- [ ] Instalar el SDK de Flutter antes de la Fase M3 (no está instalado en esta máquina — ver `mobile/README.md`)
+- [x] Instalar el SDK de Flutter antes de la Fase M3 — hecho al empezar M3: Flutter 3.47.6 stable en `C:\Users\Administrator\flutter`, añadido al PATH del usuario
 
 **Sale usable:** documentación y esqueleto listos para empezar a programar el backend en la Fase M1.
 
 ---
 
-## Fase M1 — Backend: autenticación + dominio multiusuario  ·  rama `feat/fase-m1-backend-auth` (recuperada en `fix/recupera-fase-m1`)  ·  ✅ completada, PR #10 pendiente de merge
+## Fase M1 — Backend: autenticación + dominio multiusuario  ·  rama `feat/fase-m1-backend-auth` (recuperada en `fix/recupera-fase-m1`)  ·  ✅ completada, PR #10 mergeado
 
 Cubre: RF-M1, RNF-M1.
 
@@ -51,7 +51,7 @@ Cubre: RF-M1, RNF-M1.
 
 ---
 
-## Fase M2 — Backend: imágenes + IA + exportación  ·  rama `feat/fase-m2-backend-ia`  ·  ✅ completada (código), pendiente de PR
+## Fase M2 — Backend: imágenes + IA + exportación  ·  rama `feat/fase-m2-backend-ia`  ·  ✅ completada, PR #11 mergeado
 
 Cubre: RF-7/RF-8 (subida de imágenes), RF-M3, RNF-M2, RF-13.
 
@@ -71,15 +71,22 @@ Cubre: RF-7/RF-8 (subida de imágenes), RF-M3, RNF-M2, RF-13.
 
 ---
 
-## Fase M3 — App Flutter: esqueleto + auth + colección  ·  rama `feat/fase-m3-flutter-base`
+## Fase M3 — App Flutter: esqueleto + auth + colección  ·  rama `feat/fase-m3-flutter-base`  ·  ✅ completada, PR #12 abierto
 
-Cubre: RF-M1 (cliente), RF-M2, RF-9, RF-10, RF-11, RF-12.
+Cubre: RF-M1 (cliente), RF-M2, RF-6 (alta manual), RF-9, RF-10, RF-11, RF-12, RF-14 (aviso en cliente).
 
-- [ ] Proyecto Flutter (`mobile/`), estructura de carpetas, cliente HTTP (`dio`), almacenamiento seguro del token (`flutter_secure_storage`)
-- [ ] Pantallas: login/registro, inicio (2 botones), listado + filtros + ficha + editar/borrar — contra la API real
-- [ ] Sin cámara ni IA todavía
+- [x] Proyecto Flutter (`mobile/`, `flutter create` para Android/iOS/web, id `com.antonyga.antcollect`), estructura de carpetas, cliente HTTP (`dio`, `lib/api/cliente_api.dart`), almacenamiento seguro del token (`flutter_secure_storage`, `lib/auth/almacen_tokens.dart`)
+- [x] **Renovación automática del token**: ante un 401 el cliente usa el refresh token una sola vez (aunque fallen varias peticiones a la vez) y repite la petición; si el refresco también falla, cierra la sesión y vuelve al acceso desde cualquier pantalla
+- [x] Pantallas contra la API real: acceso (login/registro en una pantalla), inicio (2 botones: "Enseñar moneda nueva" — alta manual por ahora — y "Mi colección"), listado con búsqueda de texto + hoja de filtros (país, valor, año, estado) + tirar para recargar, ficha con fotos (descargadas con el token) y todos los campos, formulario de alta/edición, borrado con confirmación, cerrar sesión con confirmación
+- [x] Duplicado (409 del backend, RF-14) → diálogo "Ya tienes este tipo" con botón para abrir la existente; nunca se guarda un duplicado
+- [x] Sin red → mensaje claro y "Reintentar"; al arrancar sin red no se pierde la sesión guardada
+- [x] Sin cámara ni IA todavía (Fase M4)
+- [x] Backend: CORS opcional (`CORS_ORIGENES`, desactivado por defecto) solo para desarrollar la app en el navegador
+- [x] Tests: 29 (`flutter test`) — 14 del cliente/sesión (token, refresco concurrente, caducidad, errores, filtros) + 15 de pantallas — contra un backend falso en memoria que imita la API (`test/backend_falso.dart`). `flutter analyze` sin avisos
 
-**Sale usable:** se puede instalar en un emulador/dispositivo, iniciar sesión y gestionar la colección a mano.
+**Sale usable:** verificado de punta a punta en Chrome (vista de móvil 390×844) contra el backend real (`uvicorn` + SQLite aislado): login fallido y correcto, listado con miniatura, ficha con foto, alta manual, aviso de duplicado con la normalización real del backend, búsqueda, edición, borrado, sesión que sobrevive a recargar y cierre de sesión.
+
+**Pendiente (fuera de esta fase):** probar en un emulador/dispositivo Android o iOS real — en esta máquina no hay Android SDK (instalar Android Studio) ni Mac para iOS. El código no usa nada específico de web; los permisos de red de Android (INTERNET; http solo en debug) e iOS (red local) ya están configurados.
 
 ---
 
@@ -143,3 +150,6 @@ Cubre: RF-M1 (borrado de cuenta visible), RNF-M3.
 | 2026-10-03 | Adaptador Claude del backend: `tool_choice: auto` + `strict: true` (el forzado da 400 en modelos actuales); modelo por defecto sigue `claude-sonnet-5` | `backend/app/ai/claude.py` |
 | 2026-10-03 | Fotos re-codificadas a JPEG sin EXIF (sin geolocalización) | `backend/app/imagenes.py` |
 | 2026-10-03 | IA con respaldo: Claude principal → OpenAI → DeepSeek, al momento y en la misma petición; solo cuentan los fallos técnicos (una foto ilegible no salta de proveedor) | `backend/app/ai/respaldo.py`, `backend/README.md` |
+| 2026-10-03 | App Flutter sin paquete de gestión de estado ni router: `ChangeNotifier` + `InheritedNotifier` y `Navigator` 1.0; solo `dio` y `flutter_secure_storage` como dependencias | `mobile/README.md` |
+| 2026-10-03 | Identificador de la app en tiendas: `com.antonyga.antcollect` | `mobile/README.md` |
+| 2026-10-03 | CORS del backend desactivado por defecto (la app nativa no lo necesita); `CORS_ORIGENES` solo para desarrollo web | `backend/app/main.py`, `backend/README.md` |

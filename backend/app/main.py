@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
+from .config import config
 from .rutas import auth, coleccion, exportar, imagenes, lecturas
 
 app = FastAPI(
@@ -16,6 +18,14 @@ app = FastAPI(
         "colección sin que el cliente lo envíe tras la confirmación humana."
     ),
 )
+
+if config.cors_origenes:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[o.strip() for o in config.cors_origenes.split(",") if o.strip()],
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 app.include_router(auth.router)
 app.include_router(coleccion.router)

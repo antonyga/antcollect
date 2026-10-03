@@ -58,6 +58,11 @@ Sin ninguna clave de IA (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
 funciona. Por defecto las fotos se guardan en `./almacen_dev/` (ignorado por
 git); en producción usar `ALMACEN=s3` (ver más abajo).
 
+CORS está desactivado por defecto: la app nativa no lo necesita. Solo para
+desarrollar la app Flutter en el navegador (`flutter run -d chrome --web-port
+5000`), poner `CORS_ORIGENES=http://localhost:5000` (lista separada por
+comas). Ver `../mobile/README.md`.
+
 ## Tests
 
 ```bash
