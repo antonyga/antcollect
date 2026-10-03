@@ -8,7 +8,34 @@
 
 ---
 
-## 1. Qué es AntCollect
+## 0. Dos líneas de trabajo: v1 escritorio y v2 móvil
+
+Este archivo (todo lo que sigue) describe la **v1 de escritorio**:
+`src/antcollect/` (Gradio, SQLite local, un solo usuario). Está **completa**
+(fases 0 a 5 mergeadas a `main`) y no se toca salvo que el usuario lo pida
+explícitamente.
+
+Desde 2026-10-03 existe una segunda línea de trabajo, **v2 móvil**: una app
+nativa (Flutter) con backend propio (FastAPI + PostgreSQL + object storage),
+multiusuario, publicada en App Store y Play Store como servicio público para
+cualquier coleccionista. Vive en `backend/` y `mobile/` (nuevos directorios,
+no tocan `src/antcollect/`). Su documentación es independiente:
+
+- Arquitectura y requisitos: [Docs/AntCollect-Movil-Arquitectura-y-Requisitos.md](Docs/AntCollect-Movil-Arquitectura-y-Requisitos.md)
+- Plan de fases: [PLAN-MOVIL.md](PLAN-MOVIL.md)
+
+**Si la tarea en curso es de la v2 móvil, usa esos dos documentos como fuente
+de verdad en vez de este archivo y de `PLAN.md`** — las reglas de este
+`CLAUDE.md` (un solo usuario, sin auth, SQLite local, RNF-8 "nada de
+autenticación") describen la v1 y no aplican a la v2, que las sustituye
+deliberadamente por diseño (ver Docs/AntCollect-Movil-Arquitectura-y-Requisitos.md
+§1). El flujo de Git (§8 de este archivo: rama + PR por fase, Conventional
+Commits en español, nunca commitear secretos) sí se mantiene igual para
+ambas líneas.
+
+---
+
+## 1. Qué es AntCollect (v1 — escritorio)
 
 App web local, **de un solo usuario**, para catalogar una colección de monedas y
 responder con fiabilidad a: *"me he encontrado esta moneda, ¿ya la tengo?"*.
