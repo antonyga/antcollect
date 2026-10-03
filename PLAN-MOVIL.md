@@ -11,7 +11,7 @@
 
 ---
 
-## Fase actual: **M0 — Fundaciones y documentación**
+## Fase actual: **M1 — Backend: autenticación + dominio multiusuario** (completa, pendiente de PR)
 
 ---
 
@@ -29,20 +29,23 @@
 
 ---
 
-## Fase M1 — Backend: autenticación + dominio multiusuario  ·  rama `feat/fase-m1-backend-auth`
+## Fase M1 — Backend: autenticación + dominio multiusuario  ·  rama `feat/fase-m1-backend-auth`  ·  ✅ completada (código), pendiente de PR
 
 Cubre: RF-M1, RNF-M1.
 
-- [ ] Esqueleto FastAPI + SQLAlchemy async + Alembic
-- [ ] Modelo `Usuario` (email, hash de contraseña, fecha de alta)
-- [ ] Auth: registro, login, refresh de JWT, borrar cuenta
-- [ ] `normalizacion.py` copiado tal cual desde `src/antcollect/`
-- [ ] `modelo.py` adaptado: `Moneda` con `usuario_id`, Pydantic/ORM en vez de `sqlite3.Row`
-- [ ] `coleccion.py` adaptado: mismo contrato (`crear`, `editar`, `borrar`, `listar`, `comprobar_tipo`, `existe_tipo_exacto`, `TipoDuplicadoError`), scopeado por `usuario_id`, sesiones async
-- [ ] Esquema PostgreSQL con `UNIQUE(usuario_id, pais_norm, valor_norm, anio, ceca_norm, variante_norm)`
-- [ ] Tests migrados de `tests/test_coleccion.py` (normalización, duplicados, "¿la tengo?": exacta/parcial/ninguna/año NULL) al nuevo dominio multiusuario
+- [x] Esqueleto FastAPI + SQLAlchemy async (`app/main.py`, `app/db.py`) + Alembic (`alembic/`, migración inicial `ba74a016b044`)
+- [x] Modelo `Usuario` (email único, hash de contraseña con `bcrypt`, fecha de alta) — `app/modelos.py`
+- [x] Auth: registro, login, refresco de JWT, borrar cuenta (`POST /auth/registro`, `/login`, `/refresco`, `GET /auth/yo`, `DELETE /auth/cuenta`) — `app/auth.py` + `app/seguridad.py` (JWT con `pyjwt`, access 30 min / refresh 30 días por defecto, configurable)
+- [x] `normalizacion.py` copiado tal cual desde `src/antcollect/`
+- [x] `modelos.py`: `Moneda` ORM con `usuario_id`, esquemas Pydantic de entrada/salida separados en `app/esquemas.py` (en vez de SQLModel, para no acoplar la forma de la API al esquema de BD)
+- [x] `coleccion.py` adaptado: mismo contrato (`crear`, `editar`, `borrar`, `listar`, `comprobar_tipo`, `existe_tipo_exacto`, `buscar_posibles_coincidencias`, `TipoDuplicadoError`), scopeado por `usuario_id`, sesiones async de SQLAlchemy
+- [x] Esquema con `UNIQUE(usuario_id, pais_norm, valor_norm, anio, ceca_norm, variante_norm)` — migración de Alembic generada y verificada (aplica limpio en una BD vacía); portable a PostgreSQL, probada contra SQLite por no tener aún Postgres provisionado (ver Fase M0)
+- [x] Tests migrados de `tests/test_coleccion.py` (normalización, duplicados, "¿la tengo?": exacta/parcial/ninguna) al nuevo dominio multiusuario — 18 tests
+- [x] **Añadido más allá del checklist original**: suite de tests de aislamiento entre usuarios (`tests/test_auth.py`, 14 tests) — confirma que dos usuarios pueden tener el mismo "tipo" sin chocar, que uno no puede leer/editar/borrar la moneda de otro (404, no 403, para no filtrar su existencia), y que borrar una cuenta borra en cascada su colección sin dejar rastro. Es la propiedad de seguridad más nueva y más crítica de la v2 frente a la v1.
 
-**Sale usable:** API de auth + CRUD de colección funcionando (sin imágenes ni IA todavía), verificable con Swagger UI/`httpx`.
+**Sale usable:** API de auth + CRUD de colección + "¿la tengo?" funcionando (sin imágenes ni IA todavía — Fase M2), verificada con 32 tests (`pytest`) contra SQLite en memoria y con un smoke test manual del servidor real (`uvicorn`) sirviendo `/salud` y el flujo completo de un usuario. `ruff check`/`ruff format --check` en verde. La v1 de escritorio sigue intacta (58 tests propios sin tocar).
+
+**Pendiente:** desplegar de verdad contra PostgreSQL en Railway (bloqueado desde la Fase M0, el MCP de Railway no conectó) — el código ya es compatible (driver `asyncpg`), solo falta la infraestructura real para probarlo end-to-end contra el motor de producción.
 
 ---
 
@@ -123,3 +126,6 @@ Cubre: RF-M1 (borrado de cuenta visible), RNF-M3.
 | 2026-10-03 | Cuota diaria de lecturas IA por usuario (coste acotado) | Docs/AntCollect-Movil-Arquitectura-y-Requisitos.md §9 |
 | 2026-10-03 | App móvil v1 = "online" (sin caché offline-first ni sync de conflictos) | Docs/AntCollect-Movil-Arquitectura-y-Requisitos.md §1 |
 | 2026-10-03 | `src/antcollect/` (v1 escritorio) no se toca por esta iniciativa | CLAUDE.md, este archivo |
+| 2026-10-03 | Backend: ORM SQLAlchemy 2.0 (no SQLModel) + esquemas Pydantic separados en `app/esquemas.py` — evita acoplar la forma de la API al esquema de BD y evita exponer columnas internas (p. ej. `password_hash`) por error | `backend/app/modelos.py`, `backend/app/esquemas.py` |
+| 2026-10-03 | Auth: JWT access (30 min) + refresh (30 días) por defecto, configurable por entorno; contraseñas con `bcrypt` directo (no `passlib`, menos mantenido) | `backend/app/seguridad.py` |
+| 2026-10-03 | Tests de backend contra SQLite en memoria (`aiosqlite` + `StaticPool`), no contra Postgres real — no bloquea desarrollo mientras Railway no esté disponible; el esquema generado por Alembic es portable | `backend/tests/conftest.py` |
