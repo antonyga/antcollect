@@ -11,7 +11,7 @@
 
 ---
 
-## Fase actual: **M4 — App Flutter: captura + lectura IA** (completa, pendiente de PR)
+## Fase actual: **M4 — App Flutter: captura + lectura IA** (completa, PR #13 abierto)
 
 > M1 (PR #10), M2 (PR #11) y M3 (PR #12) están mergeadas en `main`. La rama de M4 sale de `main` actualizado.
 
@@ -90,7 +90,7 @@ Cubre: RF-M1 (cliente), RF-M2, RF-6 (alta manual), RF-9, RF-10, RF-11, RF-12, RF
 
 ---
 
-## Fase M4 — App Flutter: captura + lectura IA  ·  rama `feat/fase-m4-flutter-ia`  ·  ✅ completada
+## Fase M4 — App Flutter: captura + lectura IA  ·  rama `feat/fase-m4-flutter-ia`  ·  ✅ completada, PR #13 abierto
 
 Cubre: RF-1, RF-2, RF-3, RF-4, RF-5, RF-6, RF-7, RF-8 (cliente), RF-13 (cliente), RF-M3 (cliente).
 
