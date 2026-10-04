@@ -167,22 +167,49 @@ backend/
 
 ## Infraestructura (Railway)
 
-PostgreSQL + bucket de object storage + servicio backend, aprovisionados en
-Railway (pendiente — el MCP de Railway no conectó en las sesiones de M0–M2;
-reintentar antes de desplegar de verdad. El código ya funciona en local
-contra SQLite y almacén en disco mientras tanto).
+Desplegado el 2026-10-04 con el CLI de Railway (`npm i -g @railway/cli`,
+`railway login`). Proyecto **antcollect**, entorno `production`, todo en
+**EU West (Ámsterdam)**:
 
-Variables del servicio backend en producción:
+- **api** — este backend. URL pública: https://api-production-e10d3.up.railway.app
+  (`/salud`, `/docs`, `/privacidad`, `/terminos`, `/borrar-cuenta`).
+- **Postgres** — accesible solo por la red privada de Railway.
+- **Bucket `antcollect-fotos`** — S3 compatible, privado. Funcionan tanto
+  el direccionamiento *path* como *virtual-host* con `boto3`, así que
+  `AlmacenS3` no necesita configuración extra.
 
-- `DATABASE_URL` → la del Postgres de Railway, con el esquema
-  `postgresql+asyncpg://`.
-- `JWT_SECRET` → un secreto largo y aleatorio.
-- `ANTHROPIC_API_KEY`, y opcionalmente `ANTCOLLECT_MODELO` y
-  `LECTURAS_IA_CUOTA_DIARIA`.
-- Respaldo (opcional): `OPENAI_API_KEY` + `ANTCOLLECT_MODELO_OPENAI`,
-  `DEEPSEEK_API_KEY` + `ANTCOLLECT_MODELO_DEEPSEEK`. Cada cuenta necesita
-  saldo y acceso al modelo elegido.
+Configuración del servicio `api` (en Railway, no en el repo):
+
+- Builder Railpack con `RAILPACK_PYTHON_VERSION=3.12` (Railpack instala
+  3.13 por defecto y `requires-python` es `<3.13`).
+- Start command: `alembic upgrade head && uvicorn app.main:app --host 0.0.0.0
+  --port $PORT --proxy-headers --forwarded-allow-ips=*` — las migraciones se
+  aplican en cada despliegue antes de arrancar.
+- Health check: `/salud`.
+
+Variables del servicio `api`:
+
+- `DATABASE_URL` →
+  `postgresql+asyncpg://${{Postgres.PGUSER}}:${{Postgres.PGPASSWORD}}@${{Postgres.PGHOST}}:${{Postgres.PGPORT}}/${{Postgres.PGDATABASE}}`
+  (referencias a las variables del Postgres, con el esquema que necesita
+  SQLAlchemy async; la `DATABASE_URL` del Postgres es `postgresql://`).
+- `JWT_SECRET` → aleatorio, generado al desplegar. Cambiarlo invalida todas
+  las sesiones abiertas.
+- `ANTHROPIC_API_KEY`, `ANTCOLLECT_MODELO=claude-sonnet-5`,
+  `LECTURAS_IA_CUOTA_DIARIA=20`. Sin respaldo de OpenAI/DeepSeek por ahora
+  (cuentas sin saldo).
 - `ALMACEN=s3` + `S3_BUCKET`, `S3_ENDPOINT_URL`, `S3_REGION`,
-  `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` → las credenciales del bucket
-  de Railway (referenciándolas desde el servicio bucket, no copiándolas).
-- Antes de arrancar: `alembic upgrade head`.
+  `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` → copiadas de
+  `railway bucket credentials --bucket antcollect-fotos`. Si se regeneran
+  las credenciales del bucket, actualizarlas aquí.
+- `LEGAL_RESPONSABLE`, `LEGAL_CONTACTO`.
+
+Desplegar una versión nueva (desde `backend/`, con `main` actualizado):
+
+```bash
+railway up --detach --service api -m "<qué cambia>"
+railway logs --service api --lines 50
+```
+
+Ojo en PowerShell: `$PORT` dentro de comillas dobles lo expande PowerShell
+(queda vacío). Usar comillas simples al editar el start command.

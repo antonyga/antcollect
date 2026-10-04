@@ -10,18 +10,18 @@
 
 ## 1. URLs que piden las tiendas
 
-Las sirve el propio backend. Con el dominio de producción (pendiente del
-despliegue en Railway) quedarán así:
+Las sirve el propio backend, desplegado en Railway (2026-10-04). Ya son
+públicas:
 
 | Para qué | URL | Dónde se pega |
 |---|---|---|
-| Política de privacidad | `https://<dominio>/privacidad` | App Store Connect → App Privacy; Play Console → Contenido de la app → Política de privacidad |
-| Términos del servicio | `https://<dominio>/terminos` | App Store Connect → licencia/EULA personalizada (opcional); descripción de la ficha |
-| Borrar la cuenta sin la app | `https://<dominio>/borrar-cuenta` | Play Console → Seguridad de los datos → "Eliminación de cuenta" |
+| Política de privacidad | `https://api-production-e10d3.up.railway.app/privacidad` | App Store Connect → App Privacy; Play Console → Contenido de la app → Política de privacidad |
+| Términos del servicio | `https://api-production-e10d3.up.railway.app/terminos` | App Store Connect → licencia/EULA personalizada (opcional); descripción de la ficha |
+| Borrar la cuenta sin la app | `https://api-production-e10d3.up.railway.app/borrar-cuenta` | Play Console → Seguridad de los datos → "Eliminación de cuenta" |
 
-Antes de publicar, configurar en el backend `LEGAL_RESPONSABLE` (nombre o
-razón social) y `LEGAL_CONTACTO` (email que aparecerá publicado). Sin ellos,
-las páginas muestran a la vista "[… sin configurar]".
+Responsable y contacto configurados en Railway: `LEGAL_RESPONSABLE=Antony
+Garcia`, `LEGAL_CONTACTO=antony.garcia@qawarelabs.com`. Si se pasa a un
+dominio propio, actualizar estas URLs en las dos consolas.
 
 ---
 
@@ -103,7 +103,7 @@ Play Console → *Contenido de la app* → **Seguridad de los datos**.
   backend desplegado).
 - ¿Qué métodos de creación de cuenta ofrece? **Nombre de usuario (email) y
   contraseña**.
-- URL para solicitar la eliminación de la cuenta: `https://<dominio>/borrar-cuenta`.
+- URL para solicitar la eliminación de la cuenta: `https://api-production-e10d3.up.railway.app/borrar-cuenta`.
 - ¿Se puede pedir que se eliminen algunos datos sin borrar la cuenta?
   **Sí**: cada moneda y cada foto se pueden borrar en la app.
 
@@ -185,7 +185,7 @@ máquina (Windows, sin Android SDK ni Xcode).
 la app en sus teléfonos y necesitan un backend público. Pendiente desde M0:
 Railway (Postgres + bucket + servicio) con `JWT_SECRET` aleatorio,
 `ALMACEN=s3`, `LEGAL_*` y las claves de IA. La app se compila apuntando a él:
-`--dart-define=ANTCOLLECT_API=https://<dominio>`.
+`--dart-define=ANTCOLLECT_API=https://api-production-e10d3.up.railway.app`.
 
 **Android — prueba interna (Play Console)**
 1. Instalar Android Studio (SDK + emulador + JDK compatible).
@@ -194,7 +194,7 @@ Railway (Postgres + bucket + servicio) con `JWT_SECRET` aleatorio,
    configurar la firma de release en `android/app/build.gradle.kts` (hoy
    firma con la clave de debug). La prueba interna ya exige un `.aab`
    firmado, así que esto se adelanta de la Fase M6.
-3. `flutter build appbundle --dart-define=ANTCOLLECT_API=https://<dominio>`.
+3. `flutter build appbundle --dart-define=ANTCOLLECT_API=https://api-production-e10d3.up.railway.app`.
 4. Play Console → crear la app (`com.antonyga.antcollect`) → *Pruebas* →
    *Prueba interna* → subir el `.aab` → añadir los emails de los testers →
    compartir el enlace de inscripción.
@@ -204,7 +204,7 @@ Railway (Postgres + bucket + servicio) con `JWT_SECRET` aleatorio,
    Codemagic que compila iOS sin Mac propio).
 2. App Store Connect → crear la app con el bundle id
    `com.antonyga.antcollect`.
-3. `flutter build ipa --dart-define=ANTCOLLECT_API=https://<dominio>` y
+3. `flutter build ipa --dart-define=ANTCOLLECT_API=https://api-production-e10d3.up.railway.app` y
    subirlo con Transporter o Xcode.
 4. TestFlight → probadores internos (hasta 100, sin revisión de Apple) o
    externos (requiere una revisión beta ligera).
