@@ -147,6 +147,15 @@ backend/
   compatible con OpenAI con el SDK `openai`. Ambos SDK solo se importan
   dentro de `ai/` (RNF-6). La cuota cuenta una lectura por petición, la
   sirva quien la sirva.
+- **Ceca y variante estables entre lecturas**: forman parte del tipo y se
+  comparan exactas, así que la misma moneda debe leerse siempre igual. El
+  prompt pide la ceca tal como está grabada ("M", no "M (ceca de Madrid)") y
+  la variante casi siempre `null`: solo para conmemorativas indicadas en la
+  propia moneda o errores visibles, nunca para describir el diseño habitual.
+  Como red de seguridad, `limpiar_ceca` quita cualquier paréntesis que se
+  cuele. El valor solo se rellena si está escrito en la foto (no se deduce
+  por la forma). Medido con la API real sobre una foto de 20 céntimos: antes,
+  3 lecturas daban 3 cecas y variantes distintas; después, 5 de 5 idénticas.
 
 ## Infraestructura (Railway)
 
