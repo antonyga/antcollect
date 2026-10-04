@@ -14,8 +14,9 @@
 ## Fase actual: **M5 — Pulido y cumplimiento de tiendas** (lo que se puede hacer desde esta máquina, hecho; rama `feat/fase-m5-cumplimiento`)
 
 > M1 (PR #10), M2 (PR #11), M3 (PR #12) y M4 (PR #13) están mergeadas en `main`.
-> Lo que queda de M5 depende de infraestructura y cuentas: desplegar el
-> backend (Railway), rellenar las consolas de las tiendas y la beta.
+> **Backend desplegado en Railway (2026-10-04)**: https://api-production-e10d3.up.railway.app — Postgres,
+> bucket y servicio en Ámsterdam (UE). Lo que queda de M5 depende de cuentas
+> y herramientas: rellenar las consolas de las tiendas y la beta.
 
 ---
 
@@ -25,7 +26,7 @@
 - [x] Este plan de fases (`PLAN-MOVIL.md`)
 - [x] `CLAUDE.md` ampliado con una sección que señale a ambos documentos y dejando explícito que `src/antcollect/` (v1) no se toca por esta iniciativa
 - [x] Estructura de carpetas `backend/` (FastAPI) y `mobile/` (Flutter) como esqueletos vacíos/mínimos
-- [ ] Infraestructura en Railway: PostgreSQL + bucket de object storage + servicio backend (skill `use-railway`) — **bloqueado**: el MCP de Railway no conectó en esta sesión (`CONNECTION_CLOSED`). Reintentar al empezar la Fase M1.
+- [x] Infraestructura en Railway: PostgreSQL + bucket de object storage + servicio backend — hecho el 2026-10-04 con el CLI de Railway (el MCP nunca conectó). Ver `backend/README.md` § Infraestructura
 - [ ] Aviso al usuario de las cuentas que debe crear él mismo: Apple Developer Program (~99 $/año) y Google Play Console (25 $ una vez) — no delegable
 - [x] Instalar el SDK de Flutter antes de la Fase M3 — hecho al empezar M3: Flutter 3.47.6 stable en `C:\Users\Administrator\flutter`, añadido al PATH del usuario
 
@@ -121,7 +122,7 @@ Cubre: RF-M1 (borrado de cuenta visible), RNF-M3.
 - [x] Icono y splash propios (moneda dorada con una "A", dibujada con Pillow en `mobile/assets/icono/generar.py`, sin tipografías de terceros) para Android (adaptativo y splash de Android 12), iOS y web; la pantalla de acceso usa la misma moneda
 - [x] Repaso de textos: revisados todos los textos visibles de la app (español, lenguaje de propuesta); sin cambios necesarios. `CFBundleName` → "AntCollect"
 - [x] Política de privacidad y términos del servicio **redactados** y servidos por el backend (`/privacidad`, `/terminos`, públicas, responsable y contacto por configuración `LEGAL_*`). Enlazados desde el registro y desde *Mi cuenta*
-- [ ] …**publicados** en una URL pública — bloqueado por el despliegue en Railway (desde M0). Antes, el usuario debe fijar `LEGAL_RESPONSABLE` y `LEGAL_CONTACTO` y revisar los textos (no son asesoría legal)
+- [x] …**publicados** en https://api-production-e10d3.up.railway.app/privacidad, /terminos y /borrar-cuenta (2026-10-04), con `LEGAL_RESPONSABLE` y `LEGAL_CONTACTO` configurados. Revisar los textos sigue siendo cosa del usuario (no son asesoría legal)
 - [x] Borrado de cuenta accesible desde la app: *Mi cuenta* → *Borrar mi cuenta*, con la contraseña (`POST /auth/cuenta/borrar`, 403 si no coincide). **Añadido**: página web `/borrar-cuenta` (email + contraseña) que exige Google Play para borrar sin la app
 - [x] Formularios de privacidad (App Privacy / Data Safety): respuestas preparadas a partir del código en [Docs/AntCollect-Movil-Tiendas.md](Docs/AntCollect-Movil-Tiendas.md), junto con clasificación por edad, ficha, cuenta de demostración para la revisión y pasos de la beta
 - [ ] …rellenarlos en App Store Connect y Play Console — los hace el usuario con sus cuentas (requiere haber creado allí la app)
@@ -177,4 +178,5 @@ Verificado de punta a punta en Chrome (vista 390×844) contra el backend real: s
 | 2026-10-04 | Borrar la cuenta exige la contraseña (`POST /auth/cuenta/borrar`, 403 si no coincide); misma operación desde la web en `/borrar-cuenta` para Google Play | `backend/app/rutas/auth.py`, `backend/app/rutas/legal.py` |
 | 2026-10-04 | Política de privacidad y términos servidos por el propio backend (no un sitio aparte): la URL publicada va siempre con la versión desplegada | `backend/app/rutas/legal.py`, `Docs/AntCollect-Movil-Tiendas.md` |
 | 2026-10-04 | Icono propio generado por código (Pillow) + `flutter_launcher_icons`/`flutter_native_splash` (solo desarrollo); enlaces externos con `url_launcher` detrás de `Dispositivo` | `mobile/README.md` |
+| 2026-10-04 | Producción en Railway, región EU West (Ámsterdam) para servicio, Postgres y bucket (RGPD); dominio `api-production-e10d3.up.railway.app` | `backend/README.md` |
 | 2026-10-04 | Prompt IA: ceca tal como está grabada, variante casi siempre `null` (solo conmemorativas indicadas en la moneda o errores visibles), valor solo si está escrito; `limpiar_ceca` como red de seguridad | `backend/app/ai/comun.py`, `backend/README.md` |
