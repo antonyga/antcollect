@@ -23,6 +23,9 @@ String urlApiPorDefecto() {
 }
 
 void main() {
+  // Antes de nada: restaurar() lee el almacenamiento seguro por un canal
+  // nativo, que en Android/iOS exige el binding ya inicializado (en web no).
+  WidgetsFlutterBinding.ensureInitialized();
   final tokens = AlmacenTokensSeguro();
   final api = ClienteApi(urlBase: urlApiPorDefecto(), tokens: tokens);
   final sesion = Sesion(api: api, tokens: tokens)..restaurar();
