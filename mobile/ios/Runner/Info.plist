@@ -79,6 +79,10 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<!-- Solo cifrado estándar del sistema (HTTPS): exento de la
+	     documentación de exportación; evita la pregunta en cada build. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>UIStatusBarHidden</key>
 	<false/>
 </dict>
