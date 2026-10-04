@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, status
 from fastapi.concurrency import run_in_threadpool
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import auth
-from ..almacen import prefijo_usuario
+from ..almacen import Almacen, prefijo_usuario
 from ..dependencias import AlmacenDep, SesionDep, UsuarioActualDep
 from ..esquemas import (
     BorrarCuentaEntrada,
@@ -72,5 +73,11 @@ async def borrar_cuenta(
     de quedar fotos personales huérfanas en el bucket."""
     if not verificar_contrasena(datos.contrasena, usuario_actual.password_hash):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Contraseña incorrecta")
-    await run_in_threadpool(almacen.borrar_prefijo, prefijo_usuario(usuario_actual.id))
-    await auth.borrar_cuenta(sesion, usuario_actual.id)
+    await borrar_cuenta_y_fotos(sesion, almacen, usuario_actual.id)
+
+
+async def borrar_cuenta_y_fotos(sesion: AsyncSession, almacen: Almacen, usuario_id: int) -> None:
+    """Fotos primero, luego la cuenta (y en cascada la colección). Compartido
+    con la página web de borrado (`rutas/legal.py`)."""
+    await run_in_threadpool(almacen.borrar_prefijo, prefijo_usuario(usuario_id))
+    await auth.borrar_cuenta(sesion, usuario_id)
