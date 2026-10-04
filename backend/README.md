@@ -12,10 +12,15 @@ que se reutiliza desde aquí — ver el catálogo de reutilización).
 
 ## Estado
 
-**Fases M1 + M2 completas** — el backend ya cubre todo lo que necesita la app:
+**Fases M1 + M2 completas, M5 en curso** — el backend ya cubre todo lo que necesita la app:
 
 - **Auth** (M1): registro, login, refresco de JWT, `GET /auth/yo`, borrado
-  de cuenta (borra también todas sus fotos).
+  de cuenta con la contraseña (`POST /auth/cuenta/borrar`, 403 si no
+  coincide; borra también todas sus fotos).
+- **Páginas públicas** (M5, RNF-M3): `/privacidad`, `/terminos` y
+  `/borrar-cuenta` (formulario web con email y contraseña, el que exige
+  Google Play para borrar la cuenta sin la app). Textos en `app/legal/`;
+  responsable y contacto en `LEGAL_RESPONSABLE` / `LEGAL_CONTACTO`.
 - **Colección** (M1): alta, edición, borrado, listado con filtros, "¿la
   tengo?" (`POST /coleccion/comprobar`), duplicados — scopeado por usuario.
 - **Fotos** (M2): `PUT/GET/DELETE /coleccion/{id}/imagenes/{anverso|reverso|detalle}`.
@@ -101,12 +106,14 @@ backend/
 │   ├── imagenes.py                      # redimensionar (copia v1) + normalizar a JPEG
 │   ├── lecturas.py                       # cuota diaria de lecturas IA
 │   ├── exportar.py                        # CSV/JSON por trozos (adaptado de la v1)
-│   └── rutas/
-│       ├── auth.py                     # /auth/*
-│       ├── coleccion.py                 # /coleccion/*
-│       ├── imagenes.py                   # /coleccion/{id}/imagenes/{cara}
-│       ├── lecturas.py                    # /lecturas, /lecturas/cuota
-│       └── exportar.py                     # /exportar
+│   ├── rutas/
+│   │   ├── auth.py                     # /auth/*
+│   │   ├── coleccion.py                 # /coleccion/*
+│   │   ├── imagenes.py                   # /coleccion/{id}/imagenes/{cara}
+│   │   ├── lecturas.py                    # /lecturas, /lecturas/cuota
+│   │   ├── exportar.py                     # /exportar
+│   │   └── legal.py                         # /privacidad, /terminos, /borrar-cuenta
+│   └── legal/                                # plantillas HTML de esas páginas
 ├── alembic/                              # migraciones (fuente de verdad del esquema)
 └── tests/
     ├── conftest.py                        # BD de pruebas en memoria + cliente HTTP
@@ -118,7 +125,8 @@ backend/
     ├── test_ai_claude.py                        # adaptador Claude (migrado de la v1)
     ├── test_ai_proveedores_respaldo.py           # adaptadores OpenAI y DeepSeek
     ├── test_ai_respaldo.py                        # cadena de respaldo y su montaje
-    └── test_almacen.py                           # contrato del almacén: local y S3 (moto)
+    ├── test_almacen.py                           # contrato del almacén: local y S3 (moto)
+    └── test_legal.py                              # páginas legales y borrado web
 ```
 
 ## Decisiones de la Fase M2

@@ -11,9 +11,11 @@
 
 ---
 
-## Fase actual: **M4 — App Flutter: captura + lectura IA** (completa, PR #13 mergeado). Siguiente: M5
+## Fase actual: **M5 — Pulido y cumplimiento de tiendas** (lo que se puede hacer desde esta máquina, hecho; rama `feat/fase-m5-cumplimiento`)
 
 > M1 (PR #10), M2 (PR #11), M3 (PR #12) y M4 (PR #13) están mergeadas en `main`.
+> Lo que queda de M5 depende de infraestructura y cuentas: desplegar el
+> backend (Railway), rellenar las consolas de las tiendas y la beta.
 
 ---
 
@@ -116,11 +118,19 @@ Cubre: RF-1, RF-2, RF-3, RF-4, RF-5, RF-6, RF-7, RF-8 (cliente), RF-13 (cliente)
 
 Cubre: RF-M1 (borrado de cuenta visible), RNF-M3.
 
-- [ ] Icono, splash, repaso de textos
-- [ ] Política de privacidad + términos de servicio publicados
-- [ ] Borrado de cuenta accesible desde la app
-- [ ] Formularios de privacidad de datos (App Privacy / Data Safety) completados
-- [ ] Beta en TestFlight (iOS) / pista interna (Android)
+- [x] Icono y splash propios (moneda dorada con una "A", dibujada con Pillow en `mobile/assets/icono/generar.py`, sin tipografías de terceros) para Android (adaptativo y splash de Android 12), iOS y web; la pantalla de acceso usa la misma moneda
+- [x] Repaso de textos: revisados todos los textos visibles de la app (español, lenguaje de propuesta); sin cambios necesarios. `CFBundleName` → "AntCollect"
+- [x] Política de privacidad y términos del servicio **redactados** y servidos por el backend (`/privacidad`, `/terminos`, públicas, responsable y contacto por configuración `LEGAL_*`). Enlazados desde el registro y desde *Mi cuenta*
+- [ ] …**publicados** en una URL pública — bloqueado por el despliegue en Railway (desde M0). Antes, el usuario debe fijar `LEGAL_RESPONSABLE` y `LEGAL_CONTACTO` y revisar los textos (no son asesoría legal)
+- [x] Borrado de cuenta accesible desde la app: *Mi cuenta* → *Borrar mi cuenta*, con la contraseña (`POST /auth/cuenta/borrar`, 403 si no coincide). **Añadido**: página web `/borrar-cuenta` (email + contraseña) que exige Google Play para borrar sin la app
+- [x] Formularios de privacidad (App Privacy / Data Safety): respuestas preparadas a partir del código en [Docs/AntCollect-Movil-Tiendas.md](Docs/AntCollect-Movil-Tiendas.md), junto con clasificación por edad, ficha, cuenta de demostración para la revisión y pasos de la beta
+- [ ] …rellenarlos en App Store Connect y Play Console — los hace el usuario con sus cuentas (requiere haber creado allí la app)
+- [x] **Añadido**: `ITSAppUsesNonExemptEncryption = false` (solo HTTPS) y firma de release de Android preparada (`android/key.properties`, fuera de git; sin él, firma de debug) — sin verificar con un build real
+- [ ] Beta en TestFlight (iOS) / pista interna (Android) — bloqueado: backend desplegado con HTTPS, Android Studio (no hay Android SDK aquí) y un Mac o CI para iOS. Pasos en el doc de tiendas §6
+
+Tests: backend 133 (`pytest`, 7 nuevos: contraseña al borrar, páginas legales, borrado web), Flutter 48 (`flutter test`, 5 nuevos de cuenta y enlaces legales). `ruff` y `flutter analyze` en verde.
+
+Verificado de punta a punta en Chrome (vista 390×844) contra el backend real: splash → registro con el aviso legal → login → *Mi cuenta* → la política de privacidad se abre en otra pestaña con el responsable configurado → borrar con la contraseña equivocada (error en el diálogo, la cuenta sigue viva) → con la buena (vuelta al acceso con aviso; el login por API da 401).
 
 **Sale usable:** build candidato a publicación, probado por el usuario en sus propios dispositivos.
 
@@ -164,4 +174,7 @@ Cubre: RF-M1 (borrado de cuenta visible), RNF-M3.
 | 2026-10-04 | Cámara con `image_picker` (cámara nativa del sistema) y exportación con `share_plus`, ambos detrás de la interfaz `Dispositivo` | `mobile/lib/captura/dispositivo.dart`, `mobile/README.md` |
 | 2026-10-04 | "¿La tengo?" consulta con los campos ya confirmados (sin `campos_dudosos`), igual que la v1: los dudosos fuerzan la revisión en el formulario, no la búsqueda | `mobile/README.md` |
 | 2026-10-04 | Al guardar: datos primero, fotos después; un fallo de foto no pierde la moneda | `mobile/lib/captura/guardado.dart` |
+| 2026-10-04 | Borrar la cuenta exige la contraseña (`POST /auth/cuenta/borrar`, 403 si no coincide); misma operación desde la web en `/borrar-cuenta` para Google Play | `backend/app/rutas/auth.py`, `backend/app/rutas/legal.py` |
+| 2026-10-04 | Política de privacidad y términos servidos por el propio backend (no un sitio aparte): la URL publicada va siempre con la versión desplegada | `backend/app/rutas/legal.py`, `Docs/AntCollect-Movil-Tiendas.md` |
+| 2026-10-04 | Icono propio generado por código (Pillow) + `flutter_launcher_icons`/`flutter_native_splash` (solo desarrollo); enlaces externos con `url_launcher` detrás de `Dispositivo` | `mobile/README.md` |
 | 2026-10-04 | Prompt IA: ceca tal como está grabada, variante casi siempre `null` (solo conmemorativas indicadas en la moneda o errores visibles), valor solo si está escrito; `limpiar_ceca` como red de seguridad | `backend/app/ai/comun.py`, `backend/README.md` |
