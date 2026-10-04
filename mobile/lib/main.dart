@@ -6,6 +6,7 @@ import 'api/cliente_api.dart';
 import 'auth/almacen_tokens.dart';
 import 'auth/pantalla_acceso.dart';
 import 'auth/sesion.dart';
+import 'captura/dispositivo.dart';
 import 'inicio/pantalla_inicio.dart';
 
 /// URL del backend. Se fija al compilar:
@@ -25,13 +26,14 @@ void main() {
   final tokens = AlmacenTokensSeguro();
   final api = ClienteApi(urlBase: urlApiPorDefecto(), tokens: tokens);
   final sesion = Sesion(api: api, tokens: tokens)..restaurar();
-  runApp(AntCollectApp(sesion: sesion));
+  runApp(AntCollectApp(sesion: sesion, dispositivo: DispositivoReal()));
 }
 
 class AntCollectApp extends StatefulWidget {
-  const AntCollectApp({super.key, required this.sesion});
+  const AntCollectApp({super.key, required this.sesion, required this.dispositivo});
 
   final Sesion sesion;
+  final Dispositivo dispositivo;
 
   @override
   State<AntCollectApp> createState() => _AntCollectAppState();
@@ -65,16 +67,19 @@ class _AntCollectAppState extends State<AntCollectApp> {
     const semilla = Color(0xFFB8860B); // dorado viejo
     return AmbitoSesion(
       sesion: widget.sesion,
-      child: MaterialApp(
-        navigatorKey: _navegador,
-        title: 'AntCollect',
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(colorSchemeSeed: semilla),
-        darkTheme: ThemeData(colorSchemeSeed: semilla, brightness: Brightness.dark),
-        locale: const Locale('es'),
-        supportedLocales: const [Locale('es')],
-        localizationsDelegates: GlobalMaterialLocalizations.delegates,
-        home: const _Raiz(),
+      child: AmbitoDispositivo(
+        dispositivo: widget.dispositivo,
+        child: MaterialApp(
+          navigatorKey: _navegador,
+          title: 'AntCollect',
+          debugShowCheckedModeBanner: false,
+          theme: ThemeData(colorSchemeSeed: semilla),
+          darkTheme: ThemeData(colorSchemeSeed: semilla, brightness: Brightness.dark),
+          locale: const Locale('es'),
+          supportedLocales: const [Locale('es')],
+          localizationsDelegates: GlobalMaterialLocalizations.delegates,
+          home: const _Raiz(),
+        ),
       ),
     );
   }

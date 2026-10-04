@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'backend_falso.dart';
+import 'dispositivo_falso.dart';
 
 const _email = 'ana@example.com';
 const _contrasena = 'contrasena-segura';
@@ -25,7 +26,7 @@ void main() {
     }
     final api = ClienteApi(urlBase: 'http://api.test', tokens: tokens, adaptador: backend);
     final sesion = Sesion(api: api, tokens: tokens);
-    await tester.pumpWidget(AntCollectApp(sesion: sesion));
+    await tester.pumpWidget(AntCollectApp(sesion: sesion, dispositivo: DispositivoFalso()));
     await tester.runAsync(sesion.restaurar);
     await tester.pumpAndSettle();
   }
@@ -33,6 +34,14 @@ void main() {
   Future<void> pulsarGuardar(WidgetTester tester) async {
     await tester.ensureVisible(find.byKey(const Key('form.guardar')));
     await tester.tap(find.byKey(const Key('form.guardar')));
+    await tester.pumpAndSettle();
+  }
+
+  /// "Enseñar moneda nueva" → "Rellenar a mano" (sin fotos ni IA).
+  Future<void> abrirAltaManual(WidgetTester tester) async {
+    await tester.tap(find.byKey(const Key('inicio.nueva')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('captura.manual')));
     await tester.pumpAndSettle();
   }
 
@@ -120,8 +129,7 @@ void main() {
 
     testWidgets('alta manual: valida obligatorios, guarda y abre la ficha', (tester) async {
       await arrancar(tester);
-      await tester.tap(find.byKey(const Key('inicio.nueva')));
-      await tester.pumpAndSettle();
+      await abrirAltaManual(tester);
 
       await pulsarGuardar(tester);
       expect(find.text('Este campo es obligatorio'), findsNWidgets(2));
@@ -140,8 +148,7 @@ void main() {
 
     testWidgets('un año imposible no se envía', (tester) async {
       await arrancar(tester);
-      await tester.tap(find.byKey(const Key('inicio.nueva')));
-      await tester.pumpAndSettle();
+      await abrirAltaManual(tester);
       await tester.enterText(find.byKey(const Key('form.pais')), 'España');
       await tester.enterText(find.byKey(const Key('form.valor')), '1 euro');
       await tester.enterText(find.byKey(const Key('form.anio')), '20022');
@@ -162,8 +169,7 @@ void main() {
         notas: 'la original',
       );
       await arrancar(tester);
-      await tester.tap(find.byKey(const Key('inicio.nueva')));
-      await tester.pumpAndSettle();
+      await abrirAltaManual(tester);
       await tester.enterText(find.byKey(const Key('form.pais')), 'españa');
       await tester.enterText(find.byKey(const Key('form.valor')), '2 euros');
       await tester.enterText(find.byKey(const Key('form.anio')), '2002');

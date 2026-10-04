@@ -25,6 +25,8 @@ if config.cors_origenes:
         allow_origins=[o.strip() for o in config.cors_origenes.split(",") if o.strip()],
         allow_methods=["*"],
         allow_headers=["*"],
+        # Para que la app web lea el nombre del archivo de /exportar.
+        expose_headers=["Content-Disposition"],
     )
 
 app.include_router(auth.router)

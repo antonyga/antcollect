@@ -11,9 +11,9 @@
 
 ---
 
-## Fase actual: **M3 — App Flutter: esqueleto + auth + colección** (completa, PR #12 abierto)
+## Fase actual: **M4 — App Flutter: captura + lectura IA** (completa, PR #13 abierto)
 
-> M1 (PR #10) y M2 (PR #11) están mergeadas en `main`. La rama de M3 sale de `main` actualizado.
+> M1 (PR #10), M2 (PR #11) y M3 (PR #12) están mergeadas en `main`. La rama de M4 sale de `main` actualizado.
 
 ---
 
@@ -71,7 +71,7 @@ Cubre: RF-7/RF-8 (subida de imágenes), RF-M3, RNF-M2, RF-13.
 
 ---
 
-## Fase M3 — App Flutter: esqueleto + auth + colección  ·  rama `feat/fase-m3-flutter-base`  ·  ✅ completada, PR #12 abierto
+## Fase M3 — App Flutter: esqueleto + auth + colección  ·  rama `feat/fase-m3-flutter-base`  ·  ✅ completada, PR #12 mergeado
 
 Cubre: RF-M1 (cliente), RF-M2, RF-6 (alta manual), RF-9, RF-10, RF-11, RF-12, RF-14 (aviso en cliente).
 
@@ -90,17 +90,25 @@ Cubre: RF-M1 (cliente), RF-M2, RF-6 (alta manual), RF-9, RF-10, RF-11, RF-12, RF
 
 ---
 
-## Fase M4 — App Flutter: captura + lectura IA  ·  rama `feat/fase-m4-flutter-ia`
+## Fase M4 — App Flutter: captura + lectura IA  ·  rama `feat/fase-m4-flutter-ia`  ·  ✅ completada, PR #13 abierto
 
-Cubre: RF-1, RF-2, RF-3, RF-4, RF-5, RF-7, RF-8 (cliente), RF-13 (cliente).
+Cubre: RF-1, RF-2, RF-3, RF-4, RF-5, RF-6, RF-7, RF-8 (cliente), RF-13 (cliente), RF-M3 (cliente).
 
-- [ ] Integración de cámara (anverso/reverso/detalle con la cámara del propio teléfono, sin selector de dispositivo USB — ver doc de arquitectura §8)
-- [ ] Pipeline compartido capturar → leer → confirmar, igual que en la v1
-- [ ] Flujo "enseñar moneda nueva" completo
-- [ ] Flujo "¿la tengo?" completo (exacta / parcial / ninguna)
-- [ ] Exportación desde la app
+- [x] Integración de cámara con `image_picker` (anverso/reverso/detalle con la cámara del teléfono o la galería, sin selector de dispositivo USB — doc de arquitectura §8). Fotos reducidas en el teléfono a 2000 px y sin metadatos de ubicación. Detrás de la interfaz `Dispositivo` para poder probar sin cámara. Permisos de iOS (`NSCameraUsageDescription`, `NSPhotoLibraryUsageDescription`) en `Info.plist`
+- [x] Pipeline compartido capturar → leer → confirmar (`lib/captura/`): `PantallaCaptura` (fotos + "Leer con IA" a petición + lecturas restantes hoy) → `PantallaFormulario` (campos propuestos, dudosos resaltados con aviso, lenguaje de propuesta) → guardar o consultar según `ModoFlujo`. La foto de detalle nunca se envía a la IA (RF-8)
+- [x] Fallos de la IA, sin red, IA no configurada (503) o cuota agotada (429) → mismo formulario a mano con el motivo (RF-6, RF-M3); sin cuota ni se ofrece leer
+- [x] Flujo "enseñar moneda nueva" completo: datos primero y fotos después (si falla una foto, la moneda ya está a salvo y se avisa)
+- [x] Flujo "¿la tengo?" completo: *Ya la tienes* con tu foto al lado de la encontrada (RF-4); *No la tienes* con "Guardar esta" reutilizando campos y fotos (RF-5); *Posible coincidencia* con las parecidas y qué campo cambia, decide el humano. Año vacío nunca da "ya la tienes"
+- [x] **Añadido**: fotos al editar una moneda guardada (añadir, cambiar, quitar)
+- [x] Exportación CSV/JSON desde "Mi colección" con la hoja de compartir del sistema (`share_plus`; en web, descarga). Backend: `expose_headers=["Content-Disposition"]` en CORS para que la app web lea el nombre del archivo
+- [x] Inicio con tres acciones: "¿La tengo?", "Enseñar moneda nueva", "Mi colección" (desplazable en pantallas bajas)
+- [x] Tests: 43 (`flutter test`; 14 nuevos en `test/flujos_test.dart`) contra el backend falso ampliado (lecturas, cuota, comprobar, fotos, exportar) y un dispositivo falso. `flutter analyze` sin avisos. Backend: 115 tests y ruff en verde
 
-**Sale usable:** la app cubre el objetivo central de principio a fin, igual que la v1 pero multiusuario y en el móvil.
+**Sale usable:** verificado de punta a punta en Chrome (vista 390×844) contra el backend real con **lectura IA real de Anthropic** sobre una foto de una moneda de 20 céntimos: registro → enseñar con IA (valor marcado dudoso, el humano corrige ceca y valor) → guardar con foto → "¿la tengo?" con la misma foto = *Ya la tienes* con las dos fotos lado a lado → cambiar la ceca = *Posible coincidencia* "Distinto: ceca" → guardar como nueva → exportar CSV con las dos monedas.
+
+**Hallazgo para revisar (backend, fuera de esta fase):** la IA rellena `ceca` y `variante` con texto descriptivo ("M (ceca de Madrid)", "M (corona)", "Diseño con retrato de Cervantes"…), distinto en cada lectura de la misma foto. El paso de confirmación lo frena (sale *Posible coincidencia*, nunca un falso "ya la tienes"), pero obliga al usuario a limpiar esos campos a mano. Conviene ajustar el prompt compartido (`backend/app/ai/comun.py`): ceca = solo la marca, variante = vacía salvo variante real.
+
+**Pendiente (fuera de esta fase):** probar la cámara en un dispositivo Android/iOS real (sin Android SDK ni Mac en esta máquina); recuperar la foto si Android cierra la app mientras la cámara está abierta (`retrieveLostData`, ver `mobile/README.md`).
 
 ---
 
@@ -153,3 +161,6 @@ Cubre: RF-M1 (borrado de cuenta visible), RNF-M3.
 | 2026-10-03 | App Flutter sin paquete de gestión de estado ni router: `ChangeNotifier` + `InheritedNotifier` y `Navigator` 1.0; solo `dio` y `flutter_secure_storage` como dependencias | `mobile/README.md` |
 | 2026-10-03 | Identificador de la app en tiendas: `com.antonyga.antcollect` | `mobile/README.md` |
 | 2026-10-03 | CORS del backend desactivado por defecto (la app nativa no lo necesita); `CORS_ORIGENES` solo para desarrollo web | `backend/app/main.py`, `backend/README.md` |
+| 2026-10-04 | Cámara con `image_picker` (cámara nativa del sistema) y exportación con `share_plus`, ambos detrás de la interfaz `Dispositivo` | `mobile/lib/captura/dispositivo.dart`, `mobile/README.md` |
+| 2026-10-04 | "¿La tengo?" consulta con los campos ya confirmados (sin `campos_dudosos`), igual que la v1: los dudosos fuerzan la revisión en el formulario, no la búsqueda | `mobile/README.md` |
+| 2026-10-04 | Al guardar: datos primero, fotos después; un fallo de foto no pierde la moneda | `mobile/lib/captura/guardado.dart` |

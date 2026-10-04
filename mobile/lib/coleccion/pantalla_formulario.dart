@@ -1,19 +1,48 @@
+import 'dart:async';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 import '../api/cliente_api.dart';
 import '../api/modelos.dart';
 import '../auth/sesion.dart';
-import 'pantalla_ficha.dart';
+import '../captura/flujo.dart';
+import '../captura/guardado.dart';
+import '../captura/pantalla_resultado.dart';
+import '../captura/selector_fotos.dart';
 
-/// Alta manual (RF-6) y edición (RF-10/RF-12) de una moneda. Nada se guarda
-/// hasta que el usuario pulsa "Guardar" sobre los campos (principio rector).
+/// Paso "confirmar" del pipeline capturar → leer → confirmar (RF-3), y
+/// también la edición de una moneda guardada (RF-10/RF-12).
 ///
-/// Devuelve la [Moneda] guardada con `Navigator.pop`, o nada si se cancela.
+/// Los campos pueden venir propuestos por la IA ([propuesta]); los dudosos se
+/// resaltan. Nada se guarda ni se consulta hasta que el usuario pulsa el botón
+/// final sobre los campos ya revisados (principio rector):
+/// - [ModoFlujo.ensenar]: "Guardar en mi colección" (RF-1).
+/// - [ModoFlujo.comprobar]: "Buscar en mi colección" → resultado (RF-2).
+///
+/// Devuelve la [Moneda] guardada con `Navigator.pop`, o nada si no se guarda.
 class PantallaFormulario extends StatefulWidget {
-  const PantallaFormulario({super.key, this.moneda});
+  const PantallaFormulario({
+    super.key,
+    this.moneda,
+    this.modo = ModoFlujo.ensenar,
+    this.propuesta,
+    this.aviso,
+    this.fotos = const {},
+  });
 
-  /// `null` = alta nueva; si no, edición de esta moneda.
+  /// `null` = moneda nueva; si no, edición de esta moneda.
   final Moneda? moneda;
+  final ModoFlujo modo;
+
+  /// Campos propuestos por la IA, si se leyó la moneda.
+  final LecturaPropuesta? propuesta;
+
+  /// Por qué se rellena a mano (cuota agotada, IA no disponible, sin red...).
+  final String? aviso;
+
+  /// Fotos hechas en el paso de captura (cara → bytes).
+  final Map<String, Uint8List> fotos;
 
   @override
   State<PantallaFormulario> createState() => _PantallaFormularioState();
@@ -28,19 +57,24 @@ class _PantallaFormularioState extends State<PantallaFormulario> {
   late final TextEditingController _variante;
   late final TextEditingController _notas;
   late String _estado;
-  bool _guardando = false;
+  late final Map<String, Uint8List> _fotosNuevas = {...widget.fotos};
+  final _fotosQuitadas = <String>{};
+  bool _enviando = false;
 
   bool get _esEdicion => widget.moneda != null;
+  bool get _comprobar => !_esEdicion && widget.modo == ModoFlujo.comprobar;
+  List<String> get _dudosos => widget.propuesta?.camposDudosos ?? const [];
 
   @override
   void initState() {
     super.initState();
     final m = widget.moneda;
-    _pais = TextEditingController(text: m?.pais);
-    _valor = TextEditingController(text: m?.valorTexto);
-    _anio = TextEditingController(text: m?.anio?.toString());
-    _ceca = TextEditingController(text: m?.ceca);
-    _variante = TextEditingController(text: m?.variante);
+    final p = widget.propuesta;
+    _pais = TextEditingController(text: m?.pais ?? p?.pais);
+    _valor = TextEditingController(text: m?.valorTexto ?? p?.valorTexto);
+    _anio = TextEditingController(text: (m?.anio ?? p?.anio)?.toString());
+    _ceca = TextEditingController(text: m?.ceca ?? p?.ceca);
+    _variante = TextEditingController(text: m?.variante ?? p?.variante);
     _notas = TextEditingController(text: m?.notas);
     _estado = m?.estado ?? 'en_coleccion';
   }
@@ -68,61 +102,81 @@ class _PantallaFormularioState extends State<PantallaFormulario> {
     estado: _estado,
   );
 
-  Future<void> _guardar() async {
+  /// Fotos guardadas que se siguen mostrando (al editar).
+  Map<String, String> get _fotosGuardadas => {
+    for (final MapEntry(key: cara, value: ruta) in (widget.moneda?.fotos ?? const {}).entries)
+      if (!_fotosQuitadas.contains(cara)) cara: ruta,
+  };
+
+  Future<void> _enviar() async {
     if (!_form.currentState!.validate()) return;
-    setState(() => _guardando = true);
-    final api = AmbitoSesion.api(context);
-    final navegador = Navigator.of(context);
-    TipoDuplicadoError? duplicado;
+    setState(() => _enviando = true);
     try {
-      final guardada = _esEdicion
-          ? await api.editar(widget.moneda!.id, _datos())
-          : await api.crear(_datos());
-      navegador.pop(guardada);
+      if (_comprobar) {
+        await _buscar();
+      } else if (_esEdicion) {
+        await _guardarEdicion();
+      } else {
+        final guardada = await guardarMonedaNueva(context, _datos(), _fotosNuevas);
+        if (guardada != null && mounted) Navigator.of(context).pop(guardada);
+      }
+    } finally {
+      if (mounted) setState(() => _enviando = false);
+    }
+  }
+
+  Future<void> _guardarEdicion() async {
+    final navegador = Navigator.of(context);
+    Moneda editada;
+    try {
+      editada = await AmbitoSesion.api(context).editar(widget.moneda!.id, _datos());
     } on TipoDuplicadoError catch (e) {
-      duplicado = e;
+      if (mounted) unawaited(avisarDuplicado(context, e));
+      return;
     } on ErrorApi catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.mensaje)));
       }
-    } finally {
-      if (mounted) setState(() => _guardando = false);
+      return;
     }
-    if (duplicado != null && mounted) await _avisarDuplicado(duplicado);
+    if (!mounted) return;
+    editada = await actualizarFotos(context, editada, _fotosNuevas, _fotosQuitadas);
+    navegador.pop(editada);
   }
 
-  /// RF-14: el tipo ya existe. Se ofrece ver la que ya tienes, sin guardar.
-  Future<void> _avisarDuplicado(TipoDuplicadoError e) async {
-    final verla = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Ya tienes este tipo'),
-        content: const Text(
-          'En tu colección ya hay una moneda con el mismo país, valor, año, ceca y variante. '
-          'Revisa los campos o abre la que ya tienes.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Revisar campos'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Ver la que ya tengo'),
-          ),
-        ],
+  /// "¿La tengo?" con los campos ya revisados por el usuario (RF-2).
+  Future<void> _buscar() async {
+    final datos = _datos();
+    final navegador = Navigator.of(context);
+    ResultadoComprobacion resultado;
+    try {
+      resultado = await AmbitoSesion.api(context).comprobar(datos);
+    } on ErrorApi catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.mensaje)));
+      }
+      return;
+    }
+    final guardada = await navegador.push<Moneda>(
+      MaterialPageRoute(
+        builder: (_) =>
+            PantallaResultado(datos: datos, fotos: {..._fotosNuevas}, resultado: resultado),
       ),
     );
-    if (verla == true && mounted) {
-      await Navigator.of(context)
-          .push(MaterialPageRoute<void>(builder: (_) => PantallaFicha(monedaId: e.existenteId)));
-    }
+    if (guardada != null) navegador.pop(guardada);
   }
+
+  String get _titulo => _esEdicion
+      ? 'Editar moneda'
+      : _comprobar
+      ? '¿La tengo?'
+      : 'Nueva moneda';
 
   @override
   Widget build(BuildContext context) {
+    final tema = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(_esEdicion ? 'Editar moneda' : 'Nueva moneda')),
+      appBar: AppBar(title: Text(_titulo)),
       body: SafeArea(
         child: Form(
           key: _form,
@@ -133,11 +187,31 @@ class _PantallaFormularioState extends State<PantallaFormulario> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (widget.aviso != null)
+                  _Aviso(
+                    key: const Key('form.aviso'),
+                    icono: Icons.edit_note,
+                    texto: widget.aviso!,
+                  ),
+                if (widget.propuesta != null) _avisoPropuesta(),
+                Text('Fotos', style: tema.textTheme.titleSmall),
+                const SizedBox(height: 8),
+                SelectorFotos(
+                  nuevas: _fotosNuevas,
+                  guardadas: _fotosGuardadas,
+                  alElegir: (cara, bytes) => setState(() => _fotosNuevas[cara] = bytes),
+                  alQuitar: (cara) => setState(() {
+                    _fotosNuevas.remove(cara);
+                    _fotosQuitadas.add(cara);
+                  }),
+                ),
+                const SizedBox(height: 24),
                 _campo(_pais, 'País', clave: 'pais', obligatorio: true),
                 _campo(
                   _valor,
                   'Valor',
                   clave: 'valor',
+                  campoApi: 'valor_texto',
                   obligatorio: true,
                   ayuda: 'Por ejemplo: 2 euros, 50 céntimos',
                 ),
@@ -184,14 +258,20 @@ class _PantallaFormularioState extends State<PantallaFormulario> {
                 const SizedBox(height: 8),
                 FilledButton.icon(
                   key: const Key('form.guardar'),
-                  onPressed: _guardando ? null : _guardar,
-                  icon: _guardando
+                  onPressed: _enviando ? null : _enviar,
+                  icon: _enviando
                       ? const SizedBox.square(
                           dimension: 18,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Icon(Icons.check),
-                  label: Text(_esEdicion ? 'Guardar cambios' : 'Guardar en mi colección'),
+                      : Icon(_comprobar ? Icons.search : Icons.check),
+                  label: Text(
+                    _esEdicion
+                        ? 'Guardar cambios'
+                        : _comprobar
+                        ? 'Buscar en mi colección'
+                        : 'Guardar en mi colección',
+                  ),
                 ),
               ],
             ),
@@ -201,25 +281,60 @@ class _PantallaFormularioState extends State<PantallaFormulario> {
     );
   }
 
+  /// Lenguaje de propuesta, nunca de resultado (CLAUDE.md §2).
+  Widget _avisoPropuesta() {
+    final accion = _comprobar ? 'buscar' : 'guardar';
+    final nombres = [for (final c in _dudosos) _nombresCampos[c] ?? c].join(', ');
+    return _Aviso(
+      key: const Key('form.propuesta'),
+      icono: Icons.auto_awesome_outlined,
+      texto: _dudosos.isEmpty
+          ? 'Campos propuestos por la IA. Revísalos antes de $accion.'
+          : 'Campos propuestos por la IA. Revisa especialmente: $nombres.',
+    );
+  }
+
+  static const _nombresCampos = {
+    'pais': 'país',
+    'valor_texto': 'valor',
+    'anio': 'año',
+    'ceca': 'ceca',
+    'variante': 'variante',
+  };
+
   Widget _campo(
     TextEditingController controlador,
     String etiqueta, {
     required String clave,
+    String? campoApi,
     bool obligatorio = false,
     String? ayuda,
     TextInputType? teclado,
     int lineas = 1,
     FormFieldValidator<String>? validador,
   }) {
+    final dudoso = _dudosos.contains(campoApi ?? clave);
+    final tema = Theme.of(context);
+    final aviso = tema.brightness == Brightness.dark
+        ? Colors.orange.shade300
+        : Colors.orange.shade900;
+    final base = obligatorio ? '$etiqueta *' : etiqueta;
+    final bordeAviso = OutlineInputBorder(borderSide: BorderSide(color: aviso, width: 2));
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: TextFormField(
         key: Key('form.$clave'),
         controller: controlador,
         decoration: InputDecoration(
-          labelText: obligatorio ? '$etiqueta *' : etiqueta,
-          helperText: ayuda,
+          labelText: dudoso ? '$base — revisar' : base,
+          helperText: dudoso ? 'La IA no lo leyó con seguridad: compruébalo en la moneda' : ayuda,
+          helperMaxLines: 2,
+          prefixIcon: dudoso ? Icon(Icons.warning_amber_rounded, color: aviso) : null,
+          labelStyle: dudoso ? TextStyle(color: aviso) : null,
+          helperStyle: dudoso ? TextStyle(color: aviso) : null,
           border: const OutlineInputBorder(),
+          enabledBorder: dudoso ? bordeAviso : null,
+          focusedBorder: dudoso ? bordeAviso : null,
         ),
         keyboardType: lineas > 1 ? TextInputType.multiline : teclado,
         minLines: lineas > 1 ? 2 : 1,
@@ -230,6 +345,37 @@ class _PantallaFormularioState extends State<PantallaFormulario> {
             (obligatorio
                 ? (v) => (v == null || v.trim().isEmpty) ? 'Este campo es obligatorio' : null
                 : null),
+      ),
+    );
+  }
+}
+
+class _Aviso extends StatelessWidget {
+  const _Aviso({super.key, required this.icono, required this.texto});
+
+  final IconData icono;
+  final String texto;
+
+  @override
+  Widget build(BuildContext context) {
+    final esquema = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Card(
+        margin: EdgeInsets.zero,
+        color: esquema.secondaryContainer,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              Icon(icono, color: esquema.onSecondaryContainer),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(texto, style: TextStyle(color: esquema.onSecondaryContainer)),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
