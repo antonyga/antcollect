@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../api/cliente_api.dart';
+import '../cuenta/enlaces_legales.dart';
 import 'sesion.dart';
 
 /// Inicio de sesión y registro (RF-M1), en la misma pantalla.
@@ -121,6 +122,7 @@ class _PantallaAccesoState extends State<PantallaAcceso> {
                       const SizedBox(height: 16),
                       Text(_error!, style: TextStyle(color: tema.colorScheme.error)),
                     ],
+                    if (_registro) ...[const SizedBox(height: 16), const AvisoLegalRegistro()],
                     const SizedBox(height: 24),
                     FilledButton(
                       key: const Key('acceso.enviar'),

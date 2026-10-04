@@ -15,6 +15,9 @@ class DispositivoFalso implements Dispositivo {
   /// Archivos entregados con la hoja de compartir.
   final compartidos = <({String nombre, String tipo, List<int> bytes})>[];
 
+  /// Enlaces abiertos en el navegador.
+  final enlaces = <Uri>[];
+
   @override
   Future<Uint8List?> elegirFoto(OrigenFoto origen) async {
     origenes.add(origen);
@@ -28,5 +31,11 @@ class DispositivoFalso implements Dispositivo {
     required String tipo,
   }) async {
     compartidos.add((nombre: nombre, tipo: tipo, bytes: bytes));
+  }
+
+  @override
+  Future<bool> abrirEnlace(Uri enlace) async {
+    enlaces.add(enlace);
+    return true;
   }
 }

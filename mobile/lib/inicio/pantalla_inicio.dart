@@ -3,30 +3,12 @@ import 'package:flutter/material.dart';
 import '../auth/sesion.dart';
 import '../captura/flujo.dart';
 import '../coleccion/pantalla_listado.dart';
+import '../cuenta/pantalla_cuenta.dart';
 
 /// Pantalla de inicio: los dos flujos de la v1 (comprobar y enseñar) y la
 /// colección.
 class PantallaInicio extends StatelessWidget {
   const PantallaInicio({super.key});
-
-  Future<void> _confirmarCierre(BuildContext context) async {
-    final sesion = AmbitoSesion.leer(context);
-    final confirmado = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('¿Cerrar sesión?'),
-        content: const Text('Tu colección sigue guardada en tu cuenta.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Cerrar sesión'),
-          ),
-        ],
-      ),
-    );
-    if (confirmado == true) await sesion.cerrarSesion();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -44,8 +26,19 @@ class PantallaInicio extends StatelessWidget {
               PopupMenuItem(enabled: false, child: Text(sesion.usuario?.email ?? '')),
               const PopupMenuDivider(),
               PopupMenuItem(
+                key: const Key('inicio.cuenta'),
+                onTap: () =>
+                    Navigator.of(context)
+                        .push(MaterialPageRoute<void>(builder: (_) => const PantallaCuenta())),
+                child: const ListTile(
+                  leading: Icon(Icons.manage_accounts_outlined),
+                  title: Text('Mi cuenta'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              PopupMenuItem(
                 key: const Key('inicio.cerrarSesion'),
-                onTap: () => _confirmarCierre(context),
+                onTap: () => confirmarCierreSesion(context),
                 child: const ListTile(
                   leading: Icon(Icons.logout),
                   title: Text('Cerrar sesión'),

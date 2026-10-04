@@ -3,11 +3,12 @@ import 'dart:typed_data';
 import 'package:flutter/widgets.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 enum OrigenFoto { camara, galeria }
 
-/// Lo que la app necesita del teléfono: hacer o elegir una foto y entregar un
-/// archivo al usuario. Detrás de una interfaz para poder probar las pantallas
+/// Lo que la app necesita del teléfono: hacer o elegir una foto, entregar un
+/// archivo al usuario y abrir un enlace. Detrás de una interfaz para poder probar las pantallas
 /// sin cámara real (los tests usan un dispositivo falso).
 abstract class Dispositivo {
   /// `null` si el usuario cancela.
@@ -15,6 +16,9 @@ abstract class Dispositivo {
 
   /// Abre la hoja de compartir del sistema (en web, descarga el archivo).
   Future<void> compartirArchivo(List<int> bytes, {required String nombre, required String tipo});
+
+  /// Abre [enlace] en el navegador del sistema. `false` si no se pudo.
+  Future<bool> abrirEnlace(Uri enlace);
 }
 
 class DispositivoReal implements Dispositivo {
@@ -50,6 +54,15 @@ class DispositivoReal implements Dispositivo {
         fileNameOverrides: [nombre],
       ),
     );
+  }
+
+  @override
+  Future<bool> abrirEnlace(Uri enlace) async {
+    try {
+      return await launchUrl(enlace, mode: LaunchMode.externalApplication);
+    } on Exception {
+      return false;
+    }
   }
 }
 
