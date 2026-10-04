@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>$titulo · AntCollect</title>
+<style>
+  :root { --fondo: #fffdf8; --texto: #2b2620; --suave: #6b6257; --acento: #8a6508; --linea: #e8e0d0; }
+  @media (prefers-color-scheme: dark) {
+    :root { --fondo: #1c1a17; --texto: #ece6dc; --suave: #b3a998; --acento: #e0b64a; --linea: #3a352e; }
+  }
+  body { margin: 0; background: var(--fondo); color: var(--texto);
+         font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 1.8rem; margin: 0 0 4px; }
+  h2 { font-size: 1.15rem; margin: 32px 0 8px; padding-top: 16px; border-top: 1px solid var(--linea); }
+  .fecha { color: var(--suave); margin: 0 0 24px; }
+  a { color: var(--acento); }
+  li { margin: 4px 0; }
+  nav { margin-top: 48px; color: var(--suave); }
+  input { font: inherit; width: 100%; max-width: 360px; box-sizing: border-box; padding: 8px 10px;
+          border: 1px solid var(--suave); border-radius: 6px; background: transparent; color: inherit; }
+  button { font: inherit; padding: 10px 16px; border: 0; border-radius: 20px;
+           background: #b3261e; color: #fff; cursor: pointer; }
+  .aviso { padding: 12px 14px; border-radius: 6px; border: 1px solid #b3261e; }
+</style>
+</head>
+<body>
+<main>
+$contenido
+<nav><a href="/privacidad">Política de privacidad</a> · <a href="/terminos">Términos del servicio</a> · <a href="/borrar-cuenta">Borrar tu cuenta</a></nav>
+</main>
+</body>
+</html>

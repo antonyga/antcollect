@@ -135,6 +135,16 @@ class BackendFalso implements HttpClientAdapter {
     if (email == null) return _detalle(401, 'No autenticado');
     final suyas = monedas[email]!;
 
+    if (metodo == 'POST' && ruta == '/auth/cuenta/borrar') {
+      if (_contrasenas[email] != datos!['contrasena']) {
+        return _detalle(403, 'Contraseña incorrecta');
+      }
+      _contrasenas.remove(email);
+      _accesos.removeWhere((_, e) => e == email);
+      _refrescos.removeWhere((_, e) => e == email);
+      monedas.remove(email);
+      return ResponseBody.fromString('', 204);
+    }
     if (metodo == 'GET' && ruta == '/auth/yo') {
       return _json({'id': _usuarioIds[email], 'email': email, 'creado_en': '2026-10-01T10:00:00Z'});
     }

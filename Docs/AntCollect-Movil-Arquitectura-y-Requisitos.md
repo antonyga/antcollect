@@ -239,6 +239,9 @@ de la v1).
   por edad.
 - Beta antes de publicar: TestFlight (iOS) / pista interna (Android).
 
+Las respuestas concretas para cada formulario, la ficha y los pasos de la
+beta están en [AntCollect-Movil-Tiendas.md](AntCollect-Movil-Tiendas.md).
+
 ---
 
 ## 11. Plan de construcción por fases

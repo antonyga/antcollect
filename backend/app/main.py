@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import config
-from .rutas import auth, coleccion, exportar, imagenes, lecturas
+from .rutas import auth, coleccion, exportar, imagenes, lecturas, legal
 
 app = FastAPI(
     title="AntCollect API",
@@ -34,6 +34,7 @@ app.include_router(coleccion.router)
 app.include_router(imagenes.router)
 app.include_router(lecturas.router)
 app.include_router(exportar.router)
+app.include_router(legal.router)
 
 
 @app.get("/salud", tags=["salud"])

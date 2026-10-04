@@ -4,11 +4,20 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, status
 from fastapi.concurrency import run_in_threadpool
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import auth
-from ..almacen import prefijo_usuario
+from ..almacen import Almacen, prefijo_usuario
 from ..dependencias import AlmacenDep, SesionDep, UsuarioActualDep
-from ..esquemas import ParDeTokens, RefrescoEntrada, UsuarioLogin, UsuarioRegistro, UsuarioSalida
+from ..esquemas import (
+    BorrarCuentaEntrada,
+    ParDeTokens,
+    RefrescoEntrada,
+    UsuarioLogin,
+    UsuarioRegistro,
+    UsuarioSalida,
+)
+from ..seguridad import verificar_contrasena
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -46,13 +55,29 @@ async def yo(usuario_actual: UsuarioActualDep) -> UsuarioSalida:
     return UsuarioSalida.model_validate(usuario_actual)
 
 
-@router.delete("/cuenta", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/cuenta/borrar", status_code=status.HTTP_204_NO_CONTENT)
 async def borrar_cuenta(
-    usuario_actual: UsuarioActualDep, sesion: SesionDep, almacen: AlmacenDep
+    datos: BorrarCuentaEntrada,
+    usuario_actual: UsuarioActualDep,
+    sesion: SesionDep,
+    almacen: AlmacenDep,
 ) -> None:
     """Borra la cuenta del usuario autenticado, toda su colección y todas sus
-    fotos (RF-M1). Las fotos primero, por el mismo motivo que al borrar una
-    moneda: si el almacén falla, la cuenta sigue existiendo y se puede
-    reintentar, en vez de quedar fotos personales huérfanas en el bucket."""
-    await run_in_threadpool(almacen.borrar_prefijo, prefijo_usuario(usuario_actual.id))
-    await auth.borrar_cuenta(sesion, usuario_actual.id)
+    fotos (RF-M1). Pide la contraseña: un token robado o un móvil
+    desbloqueado en manos ajenas no basta para borrar una colección entera.
+    Responde 403 (no 401) si no coincide, para que el cliente no lo confunda
+    con una sesión caducada.
+
+    Las fotos primero, por el mismo motivo que al borrar una moneda: si el
+    almacén falla, la cuenta sigue existiendo y se puede reintentar, en vez
+    de quedar fotos personales huérfanas en el bucket."""
+    if not verificar_contrasena(datos.contrasena, usuario_actual.password_hash):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Contraseña incorrecta")
+    await borrar_cuenta_y_fotos(sesion, almacen, usuario_actual.id)
+
+
+async def borrar_cuenta_y_fotos(sesion: AsyncSession, almacen: Almacen, usuario_id: int) -> None:
+    """Fotos primero, luego la cuenta (y en cascada la colección). Compartido
+    con la página web de borrado (`rutas/legal.py`)."""
+    await run_in_threadpool(almacen.borrar_prefijo, prefijo_usuario(usuario_id))
+    await auth.borrar_cuenta(sesion, usuario_id)

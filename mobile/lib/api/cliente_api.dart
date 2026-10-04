@@ -36,7 +36,7 @@ class TipoDuplicadoError extends ErrorApi {
 /// y repite la petición. Si el refresco también falla, borra los tokens y
 /// avisa con [alCaducarSesion] para volver a la pantalla de acceso.
 class ClienteApi {
-  ClienteApi({required String urlBase, required this._tokens, HttpClientAdapter? adaptador}) {
+  ClienteApi({required this.urlBase, required this._tokens, HttpClientAdapter? adaptador}) {
     final opciones = BaseOptions(
       baseUrl: urlBase,
       connectTimeout: const Duration(seconds: 10),
@@ -53,6 +53,7 @@ class ClienteApi {
     );
   }
 
+  final String urlBase;
   final AlmacenTokens _tokens;
   late final Dio _dio;
   late final Dio _dioRefresco; // sin interceptores: evita bucles de refresco
@@ -177,6 +178,15 @@ class ClienteApi {
     final r = await _dio.get<Map<String, dynamic>>('/auth/yo');
     return Usuario.fromJson(r.data!);
   });
+
+  /// Borra la cuenta, su colección y sus fotos. Pide la contraseña: si no
+  /// coincide, el backend responde 403 ("Contraseña incorrecta").
+  Future<void> borrarCuenta(String contrasena) =>
+      _llamar(() => _dio.post<void>('/auth/cuenta/borrar', data: {'contrasena': contrasena}));
+
+  /// Política de privacidad (`privacidad`) o términos (`terminos`), servidos
+  /// por el propio backend (páginas públicas, sin token).
+  Uri enlaceLegal(String pagina) => Uri.parse(urlBase).resolve('/$pagina');
 
   // --- Colección (RF-9, RF-10, RF-11, RF-12) ---
 

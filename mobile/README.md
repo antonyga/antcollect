@@ -10,7 +10,19 @@ arquitectura).
 
 ## Estado
 
-**Fase M4** — la app cubre el objetivo central de principio a fin:
+**Fase M5** — pulido y cumplimiento de tiendas:
+
+- **Mi cuenta** (`lib/cuenta/`, desde el icono de cuenta del inicio): email,
+  política de privacidad y términos (se abren en el navegador, servidos por
+  el backend), cerrar sesión y **borrar la cuenta** con la contraseña
+  (obligatorio para Apple, guideline 5.1.1(v)). El registro enlaza los
+  términos y la política.
+- **Icono y pantalla de arranque** propios (moneda dorada con una "A"),
+  generados para Android (adaptativo incluido), iOS y web.
+- Respuestas para los formularios de privacidad de las tiendas, ficha y
+  pasos de la beta: [../Docs/AntCollect-Movil-Tiendas.md](../Docs/AntCollect-Movil-Tiendas.md).
+
+De M4 — la app cubre el objetivo central de principio a fin:
 
 - **Capturar → leer → confirmar**, un solo pipeline para los dos flujos de
   la v1 (`lib/captura/`): fotos de anverso, reverso y detalle con la cámara
@@ -105,9 +117,47 @@ mobile/
 │   ├── inicio/          # pantalla de inicio (¿la tengo?, enseñar, colección)
 │   ├── coleccion/       # listado + filtros + exportar, ficha, formulario (confirmar/editar)
 │   ├── captura/         # pipeline: fotos, lectura IA, resultado "¿la tengo?", guardado
-│   └── cuenta/          # (Fase M5) ajustes, borrar cuenta
+│   └── cuenta/          # Mi cuenta: borrar cuenta, enlaces legales
+├── assets/icono/        # icono, splash y su generador (generar.py, Pillow)
 └── test/
 ```
+
+## Icono y pantalla de arranque
+
+Las imágenes de `assets/icono/` se dibujan con `generar.py` (Pillow, sin
+tipografías de terceros) y de ahí salen todos los tamaños de cada
+plataforma. Para cambiarlas:
+
+```bash
+cd ../backend && uv run python ../mobile/assets/icono/generar.py ../mobile/assets/icono
+cd ../mobile && dart run flutter_launcher_icons && dart run flutter_native_splash:create
+```
+
+`flutter_native_splash` reescribe `ios/Runner/Info.plist` reindentándolo
+entero: revisar el diff y quedarse solo con las claves nuevas.
+
+## Firma de release (Android)
+
+`android/app/build.gradle.kts` firma el release con la keystore de subida si
+existe `android/key.properties` (ignorado por git, igual que `*.jks`); si no,
+con la clave de debug. Una vez, con el JDK de Android Studio:
+
+```bash
+keytool -genkey -v -keystore ~/antcollect-subida.jks -keyalg RSA -keysize 2048   -validity 10000 -alias subida
+```
+
+y `android/key.properties`:
+
+```properties
+storeFile=C:/Users/<usuario>/antcollect-subida.jks
+storePassword=...
+keyAlias=subida
+keyPassword=...
+```
+
+Guardar la keystore y sus contraseñas con copia de seguridad, fuera del
+repo. Sin verificar todavía con un build real (no hay Android SDK en esta
+máquina).
 
 ## Decisiones
 
@@ -141,6 +191,12 @@ mobile/
 - **Exportación con `share_plus`**: el archivo se entrega a la hoja de
   compartir (guardar en Archivos, enviar por correo...), sin pedir permisos
   de almacenamiento.
+- **Borrar la cuenta pide la contraseña** (el backend responde 403 si no
+  coincide, no 401, para que no se confunda con una sesión caducada). El
+  diálogo solo borra; quien lo abrió cierra la sesión después, con el
+  diálogo ya cerrado (cerrar la sesión descarta todas las rutas abiertas).
+- **Enlaces externos con `url_launcher`**, detrás de `Dispositivo` como la
+  cámara y la hoja de compartir, para probarlo sin navegador.
 - **Permisos de iOS**: `NSCameraUsageDescription` y
   `NSPhotoLibraryUsageDescription` en `Info.plist` (Apple los exige y
   revisa el texto). Android no necesita permisos (usa los intents del

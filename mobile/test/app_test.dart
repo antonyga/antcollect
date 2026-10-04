@@ -14,8 +14,12 @@ const _contrasena = 'contrasena-segura';
 
 void main() {
   late BackendFalso backend;
+  late DispositivoFalso dispositivo;
 
-  setUp(() => backend = BackendFalso()..crearUsuario(_email, _contrasena));
+  setUp(() {
+    backend = BackendFalso()..crearUsuario(_email, _contrasena);
+    dispositivo = DispositivoFalso();
+  });
 
   /// Arranca la app contra el backend falso; con [conSesion] ya entra logueada.
   Future<void> arrancar(WidgetTester tester, {bool conSesion = true}) async {
@@ -26,7 +30,7 @@ void main() {
     }
     final api = ClienteApi(urlBase: 'http://api.test', tokens: tokens, adaptador: backend);
     final sesion = Sesion(api: api, tokens: tokens);
-    await tester.pumpWidget(AntCollectApp(sesion: sesion, dispositivo: DispositivoFalso()));
+    await tester.pumpWidget(AntCollectApp(sesion: sesion, dispositivo: dispositivo));
     await tester.runAsync(sesion.restaurar);
     await tester.pumpAndSettle();
   }
@@ -117,6 +121,95 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Inicia sesión para ver tu colección'), findsOneWidget);
+    });
+  });
+
+  group('cuenta (RF-M1, RNF-M3)', () {
+    Future<void> abrirCuenta(WidgetTester tester) async {
+      await tester.tap(find.byKey(const Key('inicio.menu')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('inicio.cuenta')));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> confirmarBorrado(WidgetTester tester, String contrasena) async {
+      await tester.tap(find.byKey(const Key('cuenta.borrar')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('borrarCuenta.contrasena')), contrasena);
+      await tester.tap(find.byKey(const Key('borrarCuenta.confirmar')));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('Mi cuenta muestra el email y abre los documentos legales del backend', (
+      tester,
+    ) async {
+      await arrancar(tester);
+      await abrirCuenta(tester);
+      expect(find.text(_email), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('cuenta.privacidad')));
+      await tester.tap(find.byKey(const Key('cuenta.terminos')));
+      await tester.pumpAndSettle();
+
+      expect(dispositivo.enlaces, [
+        Uri.parse('http://api.test/privacidad'),
+        Uri.parse('http://api.test/terminos'),
+      ]);
+    });
+
+    testWidgets('borrar la cuenta pide la contraseña, borra los datos y vuelve al acceso', (
+      tester,
+    ) async {
+      backend.anadirMoneda(_email, pais: 'España', valor: '1 euro');
+      await arrancar(tester);
+      await abrirCuenta(tester);
+
+      await confirmarBorrado(tester, _contrasena);
+
+      expect(backend.peticiones, contains('POST /auth/cuenta/borrar'));
+      expect(backend.monedas.containsKey(_email), isFalse);
+      expect(find.text('Inicia sesión para ver tu colección'), findsOneWidget);
+      expect(find.text('Tu cuenta y todos sus datos se han borrado.'), findsOneWidget);
+    });
+
+    testWidgets('con la contraseña equivocada no se borra nada ni se cierra la sesión', (
+      tester,
+    ) async {
+      await arrancar(tester);
+      await abrirCuenta(tester);
+
+      await confirmarBorrado(tester, 'equivocada');
+
+      expect(find.text('Contraseña incorrecta'), findsOneWidget); // dentro del diálogo
+      expect(backend.monedas.containsKey(_email), isTrue);
+
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+      expect(find.text('Mi cuenta'), findsOneWidget);
+    });
+
+    testWidgets('cancelar el borrado no llama al backend', (tester) async {
+      await arrancar(tester);
+      await abrirCuenta(tester);
+      await tester.tap(find.byKey(const Key('cuenta.borrar')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+
+      expect(backend.peticiones, isNot(contains('POST /auth/cuenta/borrar')));
+    });
+
+    testWidgets('el registro enlaza los términos y la política de privacidad', (tester) async {
+      await arrancar(tester, conSesion: false);
+      expect(find.byKey(const Key('acceso.avisoLegal')), findsNothing); // solo al registrarse
+
+      await tester.tap(find.text('¿No tienes cuenta? Regístrate'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('acceso.avisoLegal')), findsOneWidget);
+
+      await tester.tapOnText(find.textRange.ofSubstring('Política de privacidad'));
+      await tester.pumpAndSettle();
+      expect(dispositivo.enlaces, [Uri.parse('http://api.test/privacidad')]);
     });
   });
 
