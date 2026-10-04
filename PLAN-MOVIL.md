@@ -11,9 +11,9 @@
 
 ---
 
-## Fase actual: **M4 — App Flutter: captura + lectura IA** (completa, PR #13 abierto)
+## Fase actual: **M4 — App Flutter: captura + lectura IA** (completa, PR #13 mergeado). Siguiente: M5
 
-> M1 (PR #10), M2 (PR #11) y M3 (PR #12) están mergeadas en `main`. La rama de M4 sale de `main` actualizado.
+> M1 (PR #10), M2 (PR #11), M3 (PR #12) y M4 (PR #13) están mergeadas en `main`.
 
 ---
 
@@ -90,7 +90,7 @@ Cubre: RF-M1 (cliente), RF-M2, RF-6 (alta manual), RF-9, RF-10, RF-11, RF-12, RF
 
 ---
 
-## Fase M4 — App Flutter: captura + lectura IA  ·  rama `feat/fase-m4-flutter-ia`  ·  ✅ completada, PR #13 abierto
+## Fase M4 — App Flutter: captura + lectura IA  ·  rama `feat/fase-m4-flutter-ia`  ·  ✅ completada, PR #13 mergeado
 
 Cubre: RF-1, RF-2, RF-3, RF-4, RF-5, RF-6, RF-7, RF-8 (cliente), RF-13 (cliente), RF-M3 (cliente).
 
@@ -106,7 +106,7 @@ Cubre: RF-1, RF-2, RF-3, RF-4, RF-5, RF-6, RF-7, RF-8 (cliente), RF-13 (cliente)
 
 **Sale usable:** verificado de punta a punta en Chrome (vista 390×844) contra el backend real con **lectura IA real de Anthropic** sobre una foto de una moneda de 20 céntimos: registro → enseñar con IA (valor marcado dudoso, el humano corrige ceca y valor) → guardar con foto → "¿la tengo?" con la misma foto = *Ya la tienes* con las dos fotos lado a lado → cambiar la ceca = *Posible coincidencia* "Distinto: ceca" → guardar como nueva → exportar CSV con las dos monedas.
 
-**Hallazgo para revisar (backend, fuera de esta fase):** la IA rellena `ceca` y `variante` con texto descriptivo ("M (ceca de Madrid)", "M (corona)", "Diseño con retrato de Cervantes"…), distinto en cada lectura de la misma foto. El paso de confirmación lo frena (sale *Posible coincidencia*, nunca un falso "ya la tienes"), pero obliga al usuario a limpiar esos campos a mano. Conviene ajustar el prompt compartido (`backend/app/ai/comun.py`): ceca = solo la marca, variante = vacía salvo variante real.
+**Hallazgo resuelto después (rama `fix/prompt-ceca-variante`):** la IA rellenaba `ceca` y `variante` con texto descriptivo distinto en cada lectura de la misma foto ("M (ceca de Madrid)", "Diseño con retrato de Cervantes"…), y la misma moneda nunca daba "ya la tienes" sin limpiar los campos a mano. Se ajustó el prompt compartido (`backend/app/ai/comun.py`) y se añadió `limpiar_ceca`. Con la API real: antes 3 lecturas = 3 resultados distintos; después 5 de 5 idénticas.
 
 **Pendiente (fuera de esta fase):** probar la cámara en un dispositivo Android/iOS real (sin Android SDK ni Mac en esta máquina); recuperar la foto si Android cierra la app mientras la cámara está abierta (`retrieveLostData`, ver `mobile/README.md`).
 
@@ -164,3 +164,4 @@ Cubre: RF-M1 (borrado de cuenta visible), RNF-M3.
 | 2026-10-04 | Cámara con `image_picker` (cámara nativa del sistema) y exportación con `share_plus`, ambos detrás de la interfaz `Dispositivo` | `mobile/lib/captura/dispositivo.dart`, `mobile/README.md` |
 | 2026-10-04 | "¿La tengo?" consulta con los campos ya confirmados (sin `campos_dudosos`), igual que la v1: los dudosos fuerzan la revisión en el formulario, no la búsqueda | `mobile/README.md` |
 | 2026-10-04 | Al guardar: datos primero, fotos después; un fallo de foto no pierde la moneda | `mobile/lib/captura/guardado.dart` |
+| 2026-10-04 | Prompt IA: ceca tal como está grabada, variante casi siempre `null` (solo conmemorativas indicadas en la moneda o errores visibles), valor solo si está escrito; `limpiar_ceca` como red de seguridad | `backend/app/ai/comun.py`, `backend/README.md` |

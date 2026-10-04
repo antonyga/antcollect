@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import base64
 import logging
+import re
 from abc import abstractmethod
 
 from .. import imagenes
@@ -46,12 +47,17 @@ ESQUEMA_LECTURA = {
         },
         "ceca": {
             "type": ["string", "null"],
-            "description": "Marca de ceca si es visible, o null.",
+            "description": (
+                "Solo la marca de ceca tal como está grabada (p. ej. 'M', 'A', 'KM'), "
+                "sin explicaciones ni paréntesis, o null."
+            ),
         },
         "variante": {
             "type": ["string", "null"],
             "description": (
-                "Detalle distintivo visible (variante, error, tipo de canto...), o null."
+                "Solo si la moneda se distingue de la emisión normal de su tipo "
+                "(conmemorativa indicada en la propia moneda, error de acuñación): "
+                "nombre corto de 2 a 5 palabras. null para el diseño normal."
             ),
         },
         "campos_dudosos": {
@@ -73,12 +79,28 @@ reverso). Extrae solo lo que puedas leer con seguridad en las imágenes:
 - pais: país emisor tal como aparece en la moneda, o el país al que
   pertenece si es evidente por el escudo o los símbolos aunque el nombre no
   esté escrito.
-- valor: valor facial tal como aparece (p. ej. "2 euros", "50 centavos", "1 dólar").
+- valor: valor facial tal como aparece escrito (p. ej. "2 euros", "50 centavos",
+  "1 dólar"). Solo si el número está escrito en alguna de las fotos: no lo
+  deduzcas por la forma, el tamaño, el color o el diseño de la moneda. Si no
+  se ve escrito, null y añade "valor" a campos_dudosos.
 - anio: año de acuñación como número de 4 cifras, o null si no se lee con
   seguridad. Nunca inventes ni redondees un año parcialmente visible.
-- ceca: marca de ceca (letra o símbolo) si es visible, o null.
-- variante: cualquier detalle distintivo visible (error de acuñación, símbolo
-  de ceca especial, tipo de canto, etc.), o null si no hay nada reseñable.
+- ceca: SOLO la marca de ceca exactamente como está grabada: la letra o
+  letras (p. ej. "M", "A", "KM"), o, si es un símbolo sin letras, su nombre en
+  una o dos palabras (p. ej. "cornucopia"). Sin explicaciones, sin paréntesis,
+  sin describir lo que la rodea (no "M (ceca de Madrid)" ni "M bajo corona":
+  solo "M"). null si no hay marca de ceca visible.
+- variante: casi siempre null. Este catálogo compara monedas por estos cinco
+  campos, así que la variante debe salir IGUAL cada vez que se lea la misma
+  moneda. Rellénala solo si la moneda se distingue de la emisión normal de su
+  tipo, y entonces con un nombre corto de 2 a 5 palabras:
+    - moneda conmemorativa, solo si la propia moneda lo indica (inscripción o
+      fecha del acontecimiento conmemorado); nombra lo conmemorado.
+    - error de acuñación claramente visible; nombra el error.
+  Nunca describas el diseño habitual (retratos, escudos, estrellas), el canto,
+  la forma, el color, el metal ni el estado de conservación. Si crees que
+  podría ser una variante pero no estás seguro, pon null y añade "variante" a
+  campos_dudosos.
 
 Usa el anverso y el reverso de forma complementaria: si un dato solo se ve en
 una de las dos caras, úsalo igualmente.
@@ -113,6 +135,16 @@ def texto_o_none(valor: object) -> str | None:
     return valor or None
 
 
+def limpiar_ceca(valor: object) -> str | None:
+    """La ceca forma parte del tipo y se compara exacta: quita cualquier
+    explicación entre paréntesis que la IA añada pese al prompt
+    ("M (ceca de Madrid)" → "M")."""
+    texto = texto_o_none(valor)
+    if texto is None:
+        return None
+    return texto_o_none(re.sub(r"\s*\([^)]*\)", "", texto))
+
+
 def jpeg_base64(datos: bytes) -> str:
     """Imagen enderezada, reducida (RNF-4) y en JPEG, codificada en base64."""
     jpeg = imagenes.normalizar_a_jpeg(datos, config.resize_lado_largo)
@@ -136,7 +168,7 @@ def parsear_datos(datos: object) -> LecturaMoneda:
             pais=texto_o_none(datos.get("pais")),
             valor=texto_o_none(datos.get("valor")),
             anio=anio,
-            ceca=texto_o_none(datos.get("ceca")),
+            ceca=limpiar_ceca(datos.get("ceca")),
             variante=texto_o_none(datos.get("variante")),
             campos_dudosos=campos_dudosos,
         )
