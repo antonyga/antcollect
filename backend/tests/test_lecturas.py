@@ -151,7 +151,7 @@ async def test_borrar_cuenta_borra_su_historial_de_lecturas(cliente, sesion):
     cab = await registrar(cliente)
     await cliente.post("/lecturas", files=_fotos(), headers=cab)
 
-    await cliente.delete("/auth/cuenta", headers=cab)
+    await cliente.post("/auth/cuenta/borrar", json={"contrasena": "contrasena123"}, headers=cab)
 
     from app.modelos import LecturaIA
     from sqlalchemy import func, select

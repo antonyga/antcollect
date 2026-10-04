@@ -27,6 +27,12 @@ class Config(BaseSettings):
     # desarrollar la app Flutter en el navegador (`flutter run -d chrome`).
     cors_origenes: str = ""
 
+    # --- Política de privacidad y términos (RNF-M3, rutas/legal.py) ---
+    # Quién presta el servicio y dónde se le escribe. Obligatorio rellenarlos
+    # antes de publicar: los valores por defecto se ven a propósito.
+    legal_responsable: str = "[LEGAL_RESPONSABLE sin configurar]"
+    legal_contacto: str = "[LEGAL_CONTACTO sin configurar]"
+
     # --- Lectura por IA (RF-1/RF-2, RF-M3) ---
     # La clave vive SOLO aquí, en el backend (RNF-5): nunca en la app móvil.
     anthropic_api_key: str = ""

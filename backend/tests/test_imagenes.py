@@ -188,7 +188,7 @@ async def test_borrar_cuenta_borra_todas_sus_fotos_y_no_las_de_otros(cliente, al
         )
     assert len(list(almacen._raiz.rglob("*.jpg"))) == 2
 
-    r = await cliente.delete("/auth/cuenta", headers=ana)
+    r = await cliente.post("/auth/cuenta/borrar", json={"contrasena": "contrasena123"}, headers=ana)
     assert r.status_code == 204
 
     restantes = list(almacen._raiz.rglob("*.jpg"))

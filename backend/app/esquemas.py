@@ -39,6 +39,10 @@ class RefrescoEntrada(BaseModel):
     refresh_token: str
 
 
+class BorrarCuentaEntrada(BaseModel):
+    contrasena: str
+
+
 class MonedaEntrada(BaseModel):
     """Campos que el usuario confirma antes de guardar (principio rector:
     la IA solo propone, ver CLAUDE.md §2 / Docs .../Movil... §1)."""

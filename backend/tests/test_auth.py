@@ -86,11 +86,28 @@ async def test_borrar_cuenta_invalida_el_token(cliente):
     tokens = await _registrar(cliente, "ana@example.com")
     headers = _cabecera(tokens)
 
-    r = await cliente.delete("/auth/cuenta", headers=headers)
+    r = await cliente.post(
+        "/auth/cuenta/borrar", json={"contrasena": "contrasena123"}, headers=headers
+    )
     assert r.status_code == 204
 
     r = await cliente.get("/auth/yo", headers=headers)
     assert r.status_code == 401
+
+
+async def test_borrar_cuenta_exige_la_contrasena(cliente):
+    """Con un token válido pero sin la contraseña correcta no se borra nada.
+    403 y no 401: el cliente no debe confundirlo con una sesión caducada."""
+    tokens = await _registrar(cliente, "ana@example.com")
+    headers = _cabecera(tokens)
+
+    r = await cliente.post(
+        "/auth/cuenta/borrar", json={"contrasena": "no-es-la-mia"}, headers=headers
+    )
+    assert r.status_code == 403
+
+    r = await cliente.get("/auth/yo", headers=headers)
+    assert r.status_code == 200
 
 
 async def test_borrar_cuenta_borra_tambien_su_coleccion(cliente):
@@ -100,7 +117,9 @@ async def test_borrar_cuenta_borra_tambien_su_coleccion(cliente):
         "/coleccion", json={"pais": "España", "valor_texto": "2 euros"}, headers=headers
     )
 
-    r = await cliente.delete("/auth/cuenta", headers=headers)
+    r = await cliente.post(
+        "/auth/cuenta/borrar", json={"contrasena": "contrasena123"}, headers=headers
+    )
     assert r.status_code == 204
 
     # Re-registrar el mismo email tras borrar la cuenta debe ser posible
