@@ -63,7 +63,7 @@ class _PantallaAccesoState extends State<PantallaAcceso> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Icon(Icons.monetization_on_outlined, size: 64, color: tema.colorScheme.primary),
+                    Image.asset('assets/icono/moneda.png', height: 72, excludeFromSemantics: true),
                     const SizedBox(height: 8),
                     Text(
                       'AntCollect',

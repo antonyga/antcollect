@@ -10,6 +10,7 @@ Salidas (en mobile/assets/icono/):
   primer_plano.png 1024², moneda sobre transparente dentro de la zona segura
                    del icono adaptativo de Android (66 %)
   splash.png       1024², moneda sobre transparente (pantalla de arranque)
+  moneda.png       256², solo la moneda, para la pantalla de acceso
 """
 
 import math
@@ -145,4 +146,5 @@ sobre(Image.new("RGBA", (N, N), (0, 0, 0, 0)), moneda(round(N * 0.60)), sombra=F
 sobre(Image.new("RGBA", (N, N), (0, 0, 0, 0)), moneda(round(N * 0.62)), sombra=False).save(
     SALIDA / "splash.png"
 )
+moneda(256).save(SALIDA / "moneda.png")
 print("ok")
