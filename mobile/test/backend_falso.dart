@@ -26,6 +26,19 @@ class BackendFalso implements HttpClientAdapter {
   /// Rutas pedidas, en orden (p. ej. "GET /coleccion").
   final peticiones = <String>[];
 
+  /// Respuesta de la próxima `POST /lecturas` (forma de `LecturaSalida`).
+  /// Por defecto, una lectura fallida.
+  Map<String, dynamic>? proximaLectura;
+
+  /// Si no es null, `POST /lecturas` responde con este error (p. ej. 429, 503).
+  ({int codigo, String detalle})? errorLectura;
+
+  /// Campos de archivo recibidos en cada `POST /lecturas` (p. ej. [anverso]).
+  final lecturasRecibidas = <List<String>>[];
+
+  int cuotaDiaria = 20;
+  int lecturasUsadas = 0;
+
   // --- Preparación desde los tests ---
 
   void crearUsuario(String email, String contrasena) {
@@ -78,7 +91,7 @@ class BackendFalso implements HttpClientAdapter {
       'foto_detalle': null,
       'fecha_agregada': '2026-10-03T12:00:00Z',
     };
-    if (conFoto) fotos['/coleccion/$id/imagenes/anverso'] = _pngTransparente;
+    if (conFoto) fotos['/coleccion/$id/imagenes/anverso'] = pngDePrueba;
     monedas[email]!.add(moneda);
     return moneda;
   }
@@ -125,6 +138,46 @@ class BackendFalso implements HttpClientAdapter {
     if (metodo == 'GET' && ruta == '/auth/yo') {
       return _json({'id': _usuarioIds[email], 'email': email, 'creado_en': '2026-10-01T10:00:00Z'});
     }
+    if (metodo == 'GET' && ruta == '/lecturas/cuota') {
+      return _json({
+        'limite_diario': cuotaDiaria,
+        'usadas_hoy': lecturasUsadas,
+        'restantes_hoy': cuotaDiaria - lecturasUsadas,
+      });
+    }
+    if (metodo == 'POST' && ruta == '/lecturas') {
+      final error = errorLectura;
+      if (error != null) return _detalle(error.codigo, error.detalle);
+      lecturasRecibidas.add([for (final f in (options.data as FormData).files) f.key]);
+      final lectura = proximaLectura ?? const {'fallida': true};
+      final fallida = lectura['fallida'] == true;
+      if (!fallida) lecturasUsadas++;
+      return _json({
+        'pais': null,
+        'valor_texto': null,
+        'anio': null,
+        'ceca': null,
+        'variante': null,
+        'campos_dudosos': <String>[],
+        'fallida': false,
+        ...lectura,
+        'lecturas_restantes_hoy': cuotaDiaria - lecturasUsadas,
+      });
+    }
+    if (metodo == 'POST' && ruta == '/coleccion/comprobar') {
+      return _json(_comprobar(suyas, datos!));
+    }
+    if (metodo == 'GET' && ruta == '/exportar') {
+      final formato = options.queryParameters['formato'];
+      return ResponseBody.fromString(
+        formato == 'csv' ? 'pais,valor_texto\n' : '[]',
+        200,
+        headers: {
+          Headers.contentTypeHeader: [formato == 'csv' ? 'text/csv' : 'application/json'],
+          'content-disposition': ['attachment; filename="antcollect-2026-10-04.$formato"'],
+        },
+      );
+    }
     if (ruta == '/coleccion') {
       if (metodo == 'GET') return _json(_filtrar(suyas, options.queryParameters));
       if (metodo == 'POST') {
@@ -145,7 +198,21 @@ class BackendFalso implements HttpClientAdapter {
         );
       }
     }
-    final foto = RegExp(r'^/coleccion/\d+/imagenes/\w+$').hasMatch(ruta) ? fotos[ruta] : null;
+    final rutaFoto = RegExp(r'^/coleccion/(\d+)/imagenes/(\w+)$').firstMatch(ruta);
+    if (rutaFoto != null && metodo != 'GET') {
+      final moneda = suyas.where((m) => m['id'] == int.parse(rutaFoto.group(1)!)).firstOrNull;
+      if (moneda == null) return _detalle(404, 'No existe esa moneda');
+      final campo = 'foto_${rutaFoto.group(2)}';
+      if (metodo == 'DELETE') {
+        fotos.remove(ruta);
+        moneda[campo] = null;
+        return ResponseBody.fromString('', 204);
+      }
+      fotos[ruta] = pngDePrueba; // PUT: el contenido real da igual aquí
+      moneda[campo] = ruta;
+      return _json(moneda);
+    }
+    final foto = rutaFoto != null ? fotos[ruta] : null;
     if (foto != null && metodo == 'GET') {
       return ResponseBody.fromBytes(
         foto,
@@ -195,6 +262,27 @@ class BackendFalso implements HttpClientAdapter {
     Map<String, dynamic> m,
   ) => monedas.where((otra) => _tipo(otra) == _tipo(m)).firstOrNull;
 
+  /// Misma semántica que `coleccion.comprobar_tipo` del backend.
+  Map<String, dynamic> _comprobar(List<Map<String, dynamic>> suyas, Map<String, dynamic> datos) {
+    if (datos['anio'] != null) {
+      final exacta = _duplicada(suyas, datos);
+      if (exacta != null) {
+        return {'categoria': 'exacta', 'exacta': exacta, 'posibles': <Object>[]};
+      }
+    }
+    final posibles = suyas.where(
+      (m) =>
+          _norm(m['pais']) == _norm(datos['pais']) &&
+          _norm(m['valor_texto']) == _norm(datos['valor_texto']) &&
+          (datos['anio'] == null || m['anio'] == null || m['anio'] == datos['anio']),
+    );
+    return {
+      'categoria': posibles.isEmpty ? 'ninguna' : 'parcial',
+      'exacta': null,
+      'posibles': posibles.toList(),
+    };
+  }
+
   List<Map<String, dynamic>> _filtrar(List<Map<String, dynamic>> monedas, Map<String, dynamic> q) {
     bool contiene(Object? campo, Object? buscado) =>
         buscado == null || _norm(campo).contains(_norm(buscado));
@@ -238,7 +326,7 @@ class BackendFalso implements HttpClientAdapter {
   );
 }
 
-// PNG de 1×1 transparente, para las fotos de prueba.
-final _pngTransparente = base64Decode(
+/// PNG de 1×1 transparente, para las fotos de prueba.
+final pngDePrueba = base64Decode(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
 );

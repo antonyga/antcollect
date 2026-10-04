@@ -22,6 +22,9 @@ class FotoMoneda extends StatefulWidget {
   /// Para cuando una foto cambie (subida nueva) y haya que volver a pedirla.
   static void olvidar(String ruta) => _cache.remove(ruta);
 
+  @visibleForTesting
+  static void olvidarTodas() => _cache.clear();
+
   @override
   State<FotoMoneda> createState() => _FotoMonedaState();
 }

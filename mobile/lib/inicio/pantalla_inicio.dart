@@ -1,26 +1,13 @@
 import 'package:flutter/material.dart';
 
-import '../api/modelos.dart';
 import '../auth/sesion.dart';
-import '../coleccion/pantalla_ficha.dart';
-import '../coleccion/pantalla_formulario.dart';
+import '../captura/flujo.dart';
 import '../coleccion/pantalla_listado.dart';
 
-/// Pantalla de inicio: dos acciones grandes, como en la v1.
+/// Pantalla de inicio: los dos flujos de la v1 (comprobar y enseñar) y la
+/// colección.
 class PantallaInicio extends StatelessWidget {
   const PantallaInicio({super.key});
-
-  Future<void> _nuevaMoneda(BuildContext context) async {
-    final navegador = Navigator.of(context);
-    final guardada = await navegador.push<Moneda>(
-      MaterialPageRoute(builder: (_) => const PantallaFormulario()),
-    );
-    if (guardada != null) {
-      await navegador.push(
-        MaterialPageRoute<void>(builder: (_) => PantallaFicha(monedaId: guardada.id)),
-      );
-    }
-  }
 
   Future<void> _confirmarCierre(BuildContext context) async {
     final sesion = AmbitoSesion.leer(context);
@@ -73,10 +60,12 @@ class PantallaInicio extends StatelessWidget {
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 480),
-            child: Padding(
+            // Desplazable: en pantallas bajas (o en horizontal) no caben
+            // los tres botones.
+            child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
@@ -86,11 +75,19 @@ class PantallaInicio extends StatelessWidget {
                   ),
                   const SizedBox(height: 32),
                   _BotonGrande(
+                    key: const Key('inicio.comprobar'),
+                    icono: Icons.manage_search,
+                    titulo: '¿La tengo?',
+                    detalle: 'Hazle una foto a una moneda y comprueba si ya está en tu colección',
+                    onPressed: () => abrirFlujo(context, ModoFlujo.comprobar),
+                  ),
+                  const SizedBox(height: 16),
+                  _BotonGrande(
                     key: const Key('inicio.nueva'),
-                    icono: Icons.add_circle_outline,
+                    icono: Icons.add_a_photo_outlined,
                     titulo: 'Enseñar moneda nueva',
-                    detalle: 'Añádela a tu colección escribiendo sus datos',
-                    onPressed: () => _nuevaMoneda(context),
+                    detalle: 'Hazle una foto y añádela a tu colección',
+                    onPressed: () => abrirFlujo(context, ModoFlujo.ensenar),
                   ),
                   const SizedBox(height: 16),
                   _BotonGrande(

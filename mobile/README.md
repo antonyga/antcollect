@@ -10,10 +10,24 @@ arquitectura).
 
 ## Estado
 
-**Fase M3** — cuenta (registro, inicio y cierre de sesión), inicio con dos
-acciones, alta manual, listado con búsqueda y filtros, ficha con fotos,
-edición y borrado con confirmación. Todo contra la API real.
-Sin cámara ni lectura IA todavía (Fase M4).
+**Fase M4** — la app cubre el objetivo central de principio a fin:
+
+- **Capturar → leer → confirmar**, un solo pipeline para los dos flujos de
+  la v1 (`lib/captura/`): fotos de anverso, reverso y detalle con la cámara
+  o la galería; lectura IA a petición (`POST /lecturas`); formulario de
+  confirmación con los campos propuestos y los dudosos resaltados. Al final,
+  **"Enseñar moneda nueva"** guarda y **"¿La tengo?"** consulta
+  (`POST /coleccion/comprobar`): *Ya la tienes* (con tu foto al lado de la
+  encontrada), *No la tienes* (con "Guardar esta") o *Posible coincidencia*
+  (parecidas, señalando qué campo cambia; decide el usuario).
+- Si la IA no puede leer, no hay red, no está configurada o se agotó la
+  cuota del día, se pasa al mismo formulario a mano explicando por qué.
+- Fotos también al editar una moneda (añadir, cambiar, quitar).
+- Exportar la colección en CSV o JSON desde "Mi colección", con la hoja de
+  compartir del sistema (en web, descarga).
+
+De M3: cuenta (registro, inicio y cierre de sesión), listado con búsqueda y
+filtros, ficha, edición y borrado con confirmación.
 
 ## Requisitos
 
@@ -76,7 +90,9 @@ flutter test           # tests
 Los tests no necesitan backend: `test/backend_falso.dart` imita la API en
 memoria (mismas rutas, códigos y JSON) y se enchufa como adaptador HTTP de
 Dio, así que ejercitan el cliente real — cabeceras, renovación del token,
-traducción de errores — además de las pantallas.
+traducción de errores — además de las pantallas. La cámara y la hoja de
+compartir se sustituyen por `test/dispositivo_falso.dart` (la app las usa a
+través de la interfaz `Dispositivo`, `lib/captura/dispositivo.dart`).
 
 ## Estructura
 
@@ -86,9 +102,9 @@ mobile/
 │   ├── main.dart        # arranque, URL del backend, tema, raíz según sesión
 │   ├── api/             # ClienteApi (dio) + modelos espejo de backend/app/esquemas.py
 │   ├── auth/            # sesión, tokens en almacenamiento seguro, pantalla de acceso
-│   ├── inicio/          # pantalla de inicio (dos acciones)
-│   ├── coleccion/       # listado + filtros, ficha, formulario alta/edición, fotos
-│   ├── captura/         # (Fase M4) cámara + capturar → leer → confirmar
+│   ├── inicio/          # pantalla de inicio (¿la tengo?, enseñar, colección)
+│   ├── coleccion/       # listado + filtros + exportar, ficha, formulario (confirmar/editar)
+│   ├── captura/         # pipeline: fotos, lectura IA, resultado "¿la tengo?", guardado
 │   └── cuenta/          # (Fase M5) ajustes, borrar cuenta
 └── test/
 ```
@@ -110,3 +126,29 @@ mobile/
 - **Identificador de la app**: `com.antonyga.antcollect` (Android
   `applicationId` e iOS bundle id). Es el que verán las tiendas; cambiarlo
   después de publicar no es posible sin crear otra ficha.
+- **Cámara con `image_picker`** (cámara nativa del sistema, no un visor
+  propio): sin selector de dispositivo USB ni modo microscopio — el detalle
+  es una foto más de cerca con la cámara trasera (doc de arquitectura §8) y
+  **nunca se envía a la IA** (RF-8). Las fotos se reducen en el teléfono a
+  2000 px de lado largo (lo mismo que guarda el backend) para ahorrar datos,
+  y se piden sin metadatos de ubicación.
+- **Los campos dudosos solo condicionan la revisión, no la búsqueda**: igual
+  que en la v1, "¿la tengo?" se consulta con los campos *ya confirmados* por
+  el usuario. Los dudosos se resaltan en el formulario para obligar a
+  mirarlos; un año vacío nunca da "ya la tienes" (solo posible coincidencia).
+- **Las fotos se suben después de guardar los datos**: si falla alguna, la
+  moneda ya está guardada y se avisa para reintentarlo desde Editar.
+- **Exportación con `share_plus`**: el archivo se entrega a la hoja de
+  compartir (guardar en Archivos, enviar por correo...), sin pedir permisos
+  de almacenamiento.
+- **Permisos de iOS**: `NSCameraUsageDescription` y
+  `NSPhotoLibraryUsageDescription` en `Info.plist` (Apple los exige y
+  revisa el texto). Android no necesita permisos (usa los intents del
+  sistema).
+
+## Pendiente conocido
+
+- **Android puede cerrar la app mientras la cámara está abierta** si va
+  justo de memoria; al volver, la foto se pierde y hay que repetirla
+  (`ImagePicker.retrieveLostData`). Se valorará al probar en dispositivos
+  reales (Fase M5): recuperarla bien exige restaurar todo el flujo.

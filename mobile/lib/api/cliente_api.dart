@@ -210,4 +210,73 @@ class ClienteApi {
     final r = await _dio.get<List<int>>(ruta, options: Options(responseType: ResponseType.bytes));
     return Uint8List.fromList(r.data!);
   });
+
+  /// Sube (o reemplaza) la foto de una cara (RF-7/RF-8). El backend la
+  /// endereza, la reduce y le quita los metadatos.
+  Future<Moneda> subirFoto(int id, String cara, Uint8List bytes) => _llamar(() async {
+    final r = await _dio.put<Map<String, dynamic>>(
+      '/coleccion/$id/imagenes/$cara',
+      data: FormData.fromMap({'archivo': MultipartFile.fromBytes(bytes, filename: '$cara.jpg')}),
+    );
+    return Moneda.fromJson(r.data!);
+  });
+
+  Future<void> borrarFoto(int id, String cara) =>
+      _llamar(() => _dio.delete<void>('/coleccion/$id/imagenes/$cara'));
+
+  // --- Lectura IA y "¿la tengo?" (RF-1, RF-2, RF-M3) ---
+
+  /// Pide a la IA que proponga los campos. La foto de detalle nunca se envía
+  /// (RF-8). Lanza [ErrorApi] con código 429 (cuota agotada) o 503 (IA no
+  /// disponible); en ambos casos, y sin red, la app pasa al modo manual.
+  Future<LecturaPropuesta> leer(Uint8List anverso, {Uint8List? reverso}) => _llamar(() async {
+    final r = await _dio.post<Map<String, dynamic>>(
+      '/lecturas',
+      data: FormData.fromMap({
+        'anverso': MultipartFile.fromBytes(anverso, filename: 'anverso.jpg'),
+        if (reverso != null) 'reverso': MultipartFile.fromBytes(reverso, filename: 'reverso.jpg'),
+      }),
+      // La lectura puede encadenar varios proveedores de IA (respaldo).
+      options: Options(receiveTimeout: const Duration(seconds: 120)),
+    );
+    return LecturaPropuesta.fromJson(r.data!);
+  });
+
+  Future<CuotaLecturas> cuota() => _llamar(() async {
+    final r = await _dio.get<Map<String, dynamic>>('/lecturas/cuota');
+    return CuotaLecturas.fromJson(r.data!);
+  });
+
+  /// "¿La tengo?" sobre los campos ya confirmados por el usuario.
+  Future<ResultadoComprobacion> comprobar(DatosMoneda datos) => _llamar(() async {
+    final r = await _dio.post<Map<String, dynamic>>(
+      '/coleccion/comprobar',
+      data: {
+        'pais': datos.pais,
+        'valor_texto': datos.valorTexto,
+        'anio': datos.anio,
+        'ceca': datos.ceca,
+        'variante': datos.variante,
+      },
+    );
+    return ResultadoComprobacion.fromJson(r.data!);
+  });
+
+  // --- Exportación (RF-13) ---
+
+  /// Descarga toda la colección como `csv` o `json`.
+  Future<ArchivoExportado> exportar(String formato) => _llamar(() async {
+    final r = await _dio.get<List<int>>(
+      '/exportar',
+      queryParameters: {'formato': formato},
+      options: Options(responseType: ResponseType.bytes),
+    );
+    final disposicion = r.headers.value('content-disposition') ?? '';
+    final nombre = RegExp(r'filename="([^"]+)"').firstMatch(disposicion)?.group(1);
+    return ArchivoExportado(
+      bytes: r.data!,
+      nombre: nombre ?? 'antcollect.$formato',
+      tipo: formato == 'csv' ? 'text/csv' : 'application/json',
+    );
+  });
 }

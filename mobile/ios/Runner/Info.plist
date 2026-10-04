@@ -66,6 +66,12 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<!-- Textos de los permisos de cámara y fotos (image_picker). Apple los
+	     exige y los revisa: deben explicar el uso real. -->
+	<key>NSCameraUsageDescription</key>
+	<string>AntCollect usa la cámara para fotografiar tus monedas, leer sus datos y guardarlas en tu colección.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>AntCollect accede a tus fotos para que elijas las de tus monedas.</string>
 	<!-- Permite http:// solo hacia la red local (backend de desarrollo). El
 	     backend desplegado va por https. -->
 	<key>NSAppTransportSecurity</key>

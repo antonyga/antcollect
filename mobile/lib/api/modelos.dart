@@ -70,6 +70,20 @@ class Moneda {
   final Map<String, String> fotos;
   final DateTime fechaAgregada;
 
+  /// Copia con otras fotos (p. ej. tras borrar una).
+  Moneda conFotos(Map<String, String> fotos) => Moneda(
+    id: id,
+    pais: pais,
+    valorTexto: valorTexto,
+    anio: anio,
+    ceca: ceca,
+    variante: variante,
+    notas: notas,
+    estado: estado,
+    fotos: fotos,
+    fechaAgregada: fechaAgregada,
+  );
+
   /// "2 euros · 2002" — título corto para listados.
   String get titulo => anio == null ? valorTexto : '$valorTexto · $anio';
 
@@ -162,4 +176,96 @@ class FiltrosColeccion {
     if (anio != null) 'anio': anio,
     if (estado != null) 'estado': estado,
   };
+}
+
+/// Campos propuestos por la lectura IA (`POST /lecturas`). Solo es una
+/// propuesta: rellena el formulario, y nada se guarda ni se consulta hasta
+/// que el usuario la revisa (principio rector, RF-3).
+class LecturaPropuesta {
+  const LecturaPropuesta({
+    this.pais,
+    this.valorTexto,
+    this.anio,
+    this.ceca,
+    this.variante,
+    this.camposDudosos = const [],
+    this.fallida = false,
+    this.restantesHoy,
+  });
+
+  final String? pais;
+  final String? valorTexto;
+  final int? anio;
+  final String? ceca;
+  final String? variante;
+
+  /// Campos (nombres de la API: `pais`, `valor_texto`, `anio`, `ceca`,
+  /// `variante`) que la IA no leyó con seguridad: se resaltan para revisarlos.
+  final List<String> camposDudosos;
+
+  /// La IA no pudo leer la moneda: se pasa al modo manual (RF-6).
+  final bool fallida;
+  final int? restantesHoy;
+
+  factory LecturaPropuesta.fromJson(Map<String, dynamic> json) => LecturaPropuesta(
+    pais: json['pais'] as String?,
+    valorTexto: json['valor_texto'] as String?,
+    anio: json['anio'] as int?,
+    ceca: json['ceca'] as String?,
+    variante: json['variante'] as String?,
+    camposDudosos: [for (final c in json['campos_dudosos'] as List<dynamic>) c as String],
+    fallida: json['fallida'] as bool,
+    restantesHoy: json['lecturas_restantes_hoy'] as int?,
+  );
+}
+
+/// Lecturas IA que le quedan hoy al usuario (RF-M3).
+class CuotaLecturas {
+  const CuotaLecturas({
+    required this.limiteDiario,
+    required this.usadasHoy,
+    required this.restantesHoy,
+  });
+
+  final int limiteDiario;
+  final int usadasHoy;
+  final int restantesHoy;
+
+  factory CuotaLecturas.fromJson(Map<String, dynamic> json) => CuotaLecturas(
+    limiteDiario: json['limite_diario'] as int,
+    usadasHoy: json['usadas_hoy'] as int,
+    restantesHoy: json['restantes_hoy'] as int,
+  );
+}
+
+enum CategoriaComprobacion { exacta, parcial, ninguna }
+
+/// Respuesta de "¿la tengo?" (RF-2), `POST /coleccion/comprobar`.
+class ResultadoComprobacion {
+  const ResultadoComprobacion({required this.categoria, this.exacta, this.posibles = const []});
+
+  final CategoriaComprobacion categoria;
+
+  /// La moneda que coincide en los 5 campos (solo si la categoría es exacta).
+  final Moneda? exacta;
+
+  /// Tipos parecidos (mismo país y valor, y año si lo hay): decide el humano.
+  final List<Moneda> posibles;
+
+  factory ResultadoComprobacion.fromJson(Map<String, dynamic> json) => ResultadoComprobacion(
+    categoria: CategoriaComprobacion.values.byName(json['categoria'] as String),
+    exacta: json['exacta'] == null ? null : Moneda.fromJson(json['exacta'] as Map<String, dynamic>),
+    posibles: [
+      for (final m in json['posibles'] as List<dynamic>) Moneda.fromJson(m as Map<String, dynamic>),
+    ],
+  );
+}
+
+/// Archivo descargado de `GET /exportar` (RF-13).
+class ArchivoExportado {
+  const ArchivoExportado({required this.bytes, required this.nombre, required this.tipo});
+
+  final List<int> bytes;
+  final String nombre;
+  final String tipo;
 }

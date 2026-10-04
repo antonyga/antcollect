@@ -5,9 +5,10 @@ import 'package:flutter/material.dart';
 import '../api/cliente_api.dart';
 import '../api/modelos.dart';
 import '../auth/sesion.dart';
+import '../captura/dispositivo.dart';
+import '../captura/flujo.dart';
 import 'foto_moneda.dart';
 import 'pantalla_ficha.dart';
-import 'pantalla_formulario.dart';
 
 /// Listado de la colección con búsqueda de texto y filtros por país, valor,
 /// año y estado (RF-9). Siempre pide los datos al backend (RF-M2: la misma
@@ -91,16 +92,26 @@ class _PantallaListadoState extends State<PantallaListado> {
   }
 
   Future<void> _nueva() async {
-    final navegador = Navigator.of(context);
-    final guardada = await navegador.push<Moneda>(
-      MaterialPageRoute(builder: (_) => const PantallaFormulario()),
-    );
-    if (guardada == null) return;
+    await abrirFlujo(context, ModoFlujo.ensenar);
     _cargar();
-    await navegador.push(
-      MaterialPageRoute<void>(builder: (_) => PantallaFicha(monedaId: guardada.id)),
-    );
-    _cargar();
+  }
+
+  /// RF-13: toda la colección en CSV o JSON, entregada con la hoja de
+  /// compartir del sistema (guardar en archivos, enviar por correo...).
+  Future<void> _exportar(String formato) async {
+    final api = AmbitoSesion.api(context);
+    final dispositivo = AmbitoDispositivo.de(context);
+    final mensajero = ScaffoldMessenger.of(context);
+    try {
+      final archivo = await api.exportar(formato);
+      await dispositivo.compartirArchivo(archivo.bytes, nombre: archivo.nombre, tipo: archivo.tipo);
+    } on ErrorApi catch (e) {
+      mensajero.showSnackBar(SnackBar(content: Text(e.mensaje)));
+    } on Exception {
+      mensajero.showSnackBar(
+        const SnackBar(content: Text('No se pudo compartir el archivo exportado.')),
+      );
+    }
   }
 
   @override
@@ -108,6 +119,26 @@ class _PantallaListadoState extends State<PantallaListado> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Mi colección'),
+        actions: [
+          PopupMenuButton<String>(
+            key: const Key('listado.exportar'),
+            icon: const Icon(Icons.ios_share),
+            tooltip: 'Exportar colección',
+            onSelected: _exportar,
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                key: Key('listado.exportar.csv'),
+                value: 'csv',
+                child: Text('Exportar como CSV (hoja de cálculo)'),
+              ),
+              PopupMenuItem(
+                key: Key('listado.exportar.json'),
+                value: 'json',
+                child: Text('Exportar como JSON'),
+              ),
+            ],
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(64),
           child: Padding(
